@@ -64,7 +64,7 @@ Navegador (Brasil) ──► Vercel iad1 (Virgínia) ──► Supabase us-east-
      que impede os dois builds de migrarem juntos não funciona no modo transação.
    - O certificado do passo 1 → `DATABASE_SSL_CA`: o conteúdo do PEM numa linha só, com `\n` no lugar das quebras.
      Com ele, parâmetros `sslmode=...` na URL são ignorados de propósito, senão o `pg` descartaria o certificado.
-3. **Segredos** (gere no seu terminal, um por variável, e cole na Vercel com o tipo **Sensitive**):
+3. **Segredos** (gere no seu terminal, um por variável, e cole na Vercel com o tipo **Secret**, o antigo "Sensitive"):
 
 ```bash
 openssl rand -base64 32
