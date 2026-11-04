@@ -1,6 +1,8 @@
 import type { ChatMessage } from "@forja/core";
 import { authorize, GatewayError, runChat, type Effort } from "@forja/core/server";
 import { and, asc, createGatewayStore, eq, schema } from "@forja/db";
+import { callSystemPrompt } from "@/lib/call";
+import { firstName } from "@/lib/persona";
 import { getApiSession } from "@/lib/session";
 
 export const runtime = "nodejs";
@@ -27,6 +29,8 @@ export async function POST(request: Request) {
     modelId?: string;
     effort?: string;
     message?: string;
+    /** "call" = chamada de voz: respostas curtas, faladas, sem markdown. */
+    modo?: string;
   };
   const text = body.message?.trim();
   if (!body.projectId || !body.modelId || !text) {
@@ -79,8 +83,10 @@ export async function POST(request: Request) {
   const history: ChatMessage[] = rows.slice(-HISTORY_LIMIT).filter((m) => m.content.trim());
   while (history[0]?.role === "assistant") history.shift();
 
-  const system = project.instructions ? `${BASE_SYSTEM}\n\nInstruções do projeto:\n${project.instructions}` : BASE_SYSTEM;
-  const effort = EFFORTS.includes(body.effort as Effort) ? (body.effort as Effort) : undefined;
+  const call = body.modo === "call";
+  const base = call ? callSystemPrompt(firstName(user.name)) : BASE_SYSTEM;
+  const system = project.instructions ? `${base}\n\nInstruções do projeto:\n${project.instructions}` : base;
+  const effort = EFFORTS.includes(body.effort as Effort) ? (body.effort as Effort) : call ? "low" : undefined;
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({

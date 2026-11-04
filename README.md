@@ -8,7 +8,7 @@ São dois produtos sobre o mesmo núcleo:
 
 | App | Para quem | O que faz |
 |---|---|---|
-| `apps/web` (porta 3000) | Cliente | Projetos, chat multi-modelo com streaming, conectores (GitHub, Vercel, Supabase, Postgres), custos e plano |
+| `apps/web` (porta 3000) | Cliente | Central de comando, modo call (voz com o agente Hefesto), projetos, chat multi-modelo, conectores, equipe, custos e plano |
 | `apps/admin` (porta 3001) | Dono da plataforma | MRR, custo de API x receita, margem por cliente, chaves de API, catálogo e preços, planos, câmbio |
 
 ## Documentação
@@ -17,6 +17,12 @@ São dois produtos sobre o mesmo núcleo:
 2. [Arquitetura](docs/02-arquitetura.md): como as peças se ligam, as decisões e a segurança
 3. [Precificação e unit economics](docs/03-precificacao-e-unit-economics.md): planos, margens e por que não vender "ilimitado"
 4. [Roadmap até o lançamento (jan/2027)](docs/04-roadmap-lancamento.md): sprints, riscos e checklist
+5. [E-mail pelo Microsoft 365](docs/05-microsoft-365-email.md): por que Graph, limites e variáveis
+6. [Infraestrutura Supabase + Vercel](docs/06-deploy-supabase-vercel.md): passo a passo, variáveis e custos
+7. [Central e modo call](docs/07-central-e-modo-call.md): experiência imersiva e o agente de voz
+
+Prompts prontos para o Cowork: [login com GitHub](docs/cowork/01-github-login.md) ·
+[e-mail no Microsoft 365](docs/cowork/02-microsoft-365-email.md)
 
 ## Estrutura
 

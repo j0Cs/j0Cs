@@ -14,6 +14,7 @@
   "dependencies": {
     "@forja/core": "workspace:*",
     "@forja/db": "workspace:*",
+    "@vercel/functions": "^3.10.6",
     "better-auth": "^1.7.16",
     "drizzle-orm": "^0.45.4"
   },

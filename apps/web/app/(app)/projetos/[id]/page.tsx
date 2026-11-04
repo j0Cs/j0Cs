@@ -3,7 +3,7 @@ import { Badge, buttonClass, cx } from "@forja/ui";
 import { FolderGit2, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { listModelOptions } from "@/lib/models";
+import { defaultModelFor, listModelOptions } from "@/lib/models";
 import { usageMeta } from "@/lib/format";
 import { getSession } from "@/lib/session";
 import { archiveProject } from "../actions";
@@ -14,9 +14,9 @@ export default async function ProjectPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ c?: string }>;
+  searchParams: Promise<{ c?: string; q?: string }>;
 }) {
-  const [{ id }, { c }] = await Promise.all([params, searchParams]);
+  const [{ id }, { c, q }] = await Promise.all([params, searchParams]);
   const { db, org, plan } = await getSession();
 
   const project = await db.query.projects.findFirst({
@@ -99,7 +99,8 @@ export default async function ProjectPage({
           conversationId={active?.id ?? null}
           initialMessages={history}
           models={models}
-          defaultModelId={active?.modelId ?? project.defaultModelId ?? "claude-opus-5-5"}
+          defaultModelId={active?.modelId ?? project.defaultModelId ?? defaultModelFor(models)}
+          initialPrompt={!active && q ? q.slice(0, 4000) : undefined}
         />
       </div>
     </div>

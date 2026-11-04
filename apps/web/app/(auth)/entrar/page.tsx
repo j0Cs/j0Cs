@@ -10,7 +10,7 @@ export const metadata = { title: "Entrar" };
 
 export default async function SignInPage({ searchParams }: { searchParams: Promise<{ convite?: string; senha?: string; next?: string }> }) {
   const { convite, senha, next } = await searchParams;
-  const after = convite ? `/convite/${convite}` : (next ?? "/projetos");
+  const after = convite ? `/convite/${convite}` : (next ?? "/central");
   if (await getAuthUser()) redirect(after);
 
   return (

@@ -321,7 +321,7 @@ export const DEFAULT_PRICING_SETTINGS: PricingSettings = {
 /** Premissas do simulador de margem (editáveis em Câmbio e taxas). Validar com a contabilidade. */
 export const DEFAULT_ECONOMICS: PlanEconomicsAssumptions = {
   revenueTaxPercent: 11,
-  paymentFeePercent: 4,
+  paymentFeePercent: 5,
   blendedMarkupPercent: 50,
   infraPerSeatBrlCents: 20_00,
 };

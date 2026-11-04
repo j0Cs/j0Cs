@@ -51,6 +51,8 @@ export interface UsageRecord {
     costOverheadPercent: number;
     markupPercent: number;
     byok: boolean;
+    /** Segundos de voz cobrados (chamadas em nuvem). */
+    voiceSeconds?: number;
   };
   latencyMs: number;
   status: "ok" | "refused" | "error";

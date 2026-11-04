@@ -10,7 +10,7 @@ import { ACTIVE_ORG_COOKIE, getAuthUser } from "@/lib/session";
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
 /** Só aceita caminhos internos para o "voltar para" (evita redirecionamento aberto). */
-const safeNext = (v: string) => (v.startsWith("/") && !v.startsWith("//") ? v : "/projetos");
+const safeNext = (v: string) => (v.startsWith("/") && !v.startsWith("//") ? v : "/central");
 
 async function setActiveOrg(orgId: string) {
   (await cookies()).set(ACTIVE_ORG_COOKIE, orgId, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
@@ -39,7 +39,7 @@ export async function signUpAction(_: FormState, f: FormData): Promise<FormState
   let email: string;
   try {
     const res = await getWebAuth().api.signUpEmail({
-      body: { name, email: str(f, "email").toLowerCase(), password: String(f.get("password") ?? ""), callbackURL: "/projetos" },
+      body: { name, email: str(f, "email").toLowerCase(), password: String(f.get("password") ?? ""), callbackURL: "/central" },
       headers: await headers(),
     });
     userId = res.user.id;
@@ -58,7 +58,7 @@ export async function signUpAction(_: FormState, f: FormData): Promise<FormState
     if (err instanceof OrgError) return { error: err.message };
     throw err;
   }
-  redirect("/projetos");
+  redirect("/central");
 }
 
 export async function magicLinkAction(_: FormState, f: FormData): Promise<FormState> {
@@ -113,7 +113,7 @@ export async function createOrgAction(_: FormState, f: FormData): Promise<FormSt
   if (!name) return { error: "Informe o nome da empresa." };
   const org = await createOrganizationForUser(getDb(), { userId: user.id, name });
   await setActiveOrg(org.id);
-  redirect("/projetos");
+  redirect("/central");
 }
 
 export async function acceptInviteAction(_: FormState, f: FormData): Promise<FormState> {
@@ -127,5 +127,5 @@ export async function acceptInviteAction(_: FormState, f: FormData): Promise<For
     if (err instanceof OrgError) return { error: err.message };
     throw err;
   }
-  redirect("/projetos");
+  redirect("/central");
 }

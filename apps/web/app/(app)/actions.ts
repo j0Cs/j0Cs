@@ -17,11 +17,11 @@ export async function switchOrg(formData: FormData) {
   if (orgs.some((o) => o.org.id === id)) {
     (await cookies()).set(ACTIVE_ORG_COOKIE, id, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
   }
-  redirect("/projetos");
+  redirect("/central");
 }
 
 export async function resendVerification() {
   const user = await getAuthUser();
   if (!user || user.emailVerified) return;
-  await getWebAuth().api.sendVerificationEmail({ body: { email: user.email, callbackURL: "/projetos" }, headers: await headers() });
+  await getWebAuth().api.sendVerificationEmail({ body: { email: user.email, callbackURL: "/central" }, headers: await headers() });
 }

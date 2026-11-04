@@ -1,3 +1,4 @@
+import { attachDatabasePool } from "@vercel/functions";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "./schema";
@@ -29,9 +30,12 @@ export function getDb(): Db {
     g.__forjaPool = new pg.Pool({
       connectionString,
       max: Number(process.env.DATABASE_POOL_MAX ?? 10),
-      idleTimeoutMillis: 10_000,
+      idleTimeoutMillis: 5_000,
+      connectionTimeoutMillis: 10_000,
       ssl: sslConfig(),
     });
+    // Fluid compute: libera conexões ociosas antes de a instância hibernar (sem efeito fora da Vercel).
+    attachDatabasePool(g.__forjaPool);
     g.__forjaDb = drizzle(g.__forjaPool, { schema });
   }
   return g.__forjaDb;

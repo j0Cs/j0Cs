@@ -43,6 +43,8 @@ export function Chat(props: {
   initialMessages: Msg[];
   models: ModelOption[];
   defaultModelId: string;
+  /** Pedido vindo da Central (modo escrever): enviado automaticamente uma vez. */
+  initialPrompt?: string;
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<Msg[]>(props.initialMessages);
@@ -66,8 +68,17 @@ export function Chat(props: {
     items: props.models.filter((m) => m.tier === tier),
   }));
 
-  async function send() {
-    const text = input.trim();
+  const autoSent = useRef(false);
+  useEffect(() => {
+    if (props.initialPrompt && !autoSent.current && messages.length === 0) {
+      autoSent.current = true;
+      void send(props.initialPrompt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function send(override?: string) {
+    const text = (override ?? input).trim();
     if (!text || busy) return;
     setInput("");
     setBusy(true);

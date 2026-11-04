@@ -65,18 +65,27 @@ export async function sendEmail(msg: EmailMessage, fetchImpl: typeof fetch = fet
   }
 
   const token = await graphToken(cfg, fetchImpl);
-  const res = await fetchImpl(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(cfg.from)}/sendMail`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      message: {
-        subject: msg.subject,
-        body: { contentType: "HTML", content: msg.html },
-        toRecipients: [{ emailAddress: { address: msg.to } }],
-      },
-      saveToSentItems: false,
-    }),
-  });
+  const enviar = () =>
+    fetchImpl(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(cfg.from)}/sendMail`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        message: {
+          subject: msg.subject,
+          body: { contentType: "HTML", content: msg.html },
+          toRecipients: [{ emailAddress: { address: msg.to } }],
+        },
+        // boolean de verdade (links de acesso não devem ficar guardados em Itens Enviados)
+        saveToSentItems: false,
+      }),
+    });
+  let res = await enviar();
+  // Limites do Exchange/Graph (30/min, 4 simultâneos por caixa): espera o Retry-After e tenta 1x
+  if (res.status === 429 || res.status === 503) {
+    const espera = Math.min(Number(res.headers.get("retry-after") ?? 2), 10) * 1000;
+    await new Promise((r) => setTimeout(r, espera));
+    res = await enviar();
+  }
   // Sucesso = 202 Accepted (o Exchange entrega de forma assíncrona).
   if (res.status !== 202) {
     if (res.status === 401) cachedToken = null;

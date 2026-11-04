@@ -88,10 +88,10 @@ Regras que estão no código e cobertas por testes (`packages/core/test`):
 | Linguagem/stack | TypeScript ponta a ponta, Next.js 16, Postgres + Drizzle | Um time pequeno mantém tudo; SDKs oficiais de todos os provedores existem em TS | Python (FastAPI) no backend: dois ecossistemas para manter |
 | Gateway de IA | **Próprio**, com SDKs oficiais (Anthropic, OpenAI, Google; xAI pelo SDK da OpenAI, como a própria xAI documenta) | Controle total de medição, cache, fallback e failover de chaves, que é onde mora a margem | OpenRouter (cobra ~5% e esconde detalhes de cache) ou LiteLLM (serviço Python extra). OpenRouter pode entrar depois como provedor de reserva |
 | Cobrança | **Créditos pré-pagos em R$** + assinatura | Elimina o risco de um cliente pesado dar prejuízo; o cliente controla o gasto | "Ilimitado" com limite escondido (ver doc 3) |
-| Banco | Postgres gerenciado na **região São Paulo** (Supabase ou Neon) | Latência e LGPD; o Supabase também é conector do cliente | MySQL/PlanetScale |
-| Hospedagem | Vercel para os dois apps | Deploy por PR, streaming, região GRU | Railway/Fly (mais trabalho de operação) |
 | Login | **Better Auth** (`packages/auth`): e-mail e senha, link mágico, GitHub OAuth, 2FA no painel. Organizações e convites são nossos (`packages/db/src/orgs.ts`) | Usuários ficam no seu banco, sem lock-in nem custo por usuário | Supabase Auth, Clerk (pago por usuário ativo) |
-| Pagamentos | **Asaas** no lançamento (Pix Automático, boleto, cartão recorrente, emissão de NFS-e); Stripe quando vender para fora | Cliente brasileiro paga com Pix e boleto e exige nota fiscal | Stripe só (tem Pix, mas a NFS-e fica por sua conta), Pagar.me, Iugu |
+| Pagamentos | **Stripe** (conta brasileira): assinatura no cartão ou boleto, recargas com Pix ou cartão, Customer Portal; NFS-e via NFE.io (app da Stripe ou API) | Escolha do dono; API madura, portal pronto, serve para vender fora depois | Asaas (tem Pix Automático e NFS-e embutidos), Pagar.me, Iugu |
+| E-mail | **Microsoft 365** (Graph `sendMail`, caixa única via RBAC para Aplicativos) — doc 5 | Já é a ferramenta da empresa; sem custo extra | Resend, provedor dedicado (quando o volume crescer) |
+| Hospedagem e banco | **Vercel Pro (gru1) + Supabase Pro (sa-east-1)** — doc 6 | Mesma região AWS em São Paulo; já usados pelo dono | Railway/Fly + Neon |
 | Tarefas longas de agente | Fila de jobs (Inngest ou Trigger.dev) + sandbox (E2B, Vercel Sandbox ou Daytona), na fase 2 | Funções serverless têm tempo máximo; agente que roda testes precisa de contêiner | Servidor próprio com Docker |
 
 ## Segurança

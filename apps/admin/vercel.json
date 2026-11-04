@@ -1,4 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["gru1"]
+  "regions": ["gru1"],
+  "buildCommand": "pnpm --filter @forja/db migrate && pnpm --filter @forja/db seed && next build"
 }

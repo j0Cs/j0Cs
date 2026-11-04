@@ -1,7 +1,8 @@
 # 3. Precificação e unit economics
 
 > Os números usam as configurações padrão do sistema: câmbio **R$ 5,40**, sobrecusto de **15%** sobre o custo de API
-> (IOF, spread e reserva para tributos), impostos sobre faturamento de **11%**, gateway de pagamento de **4%** e
+> (IOF, spread e reserva para tributos), impostos sobre faturamento de **11%**, Stripe de **5%** (cartão 3,99% + R$ 0,39
+> e Billing 0,7%) e
 > infra de **R$ 20 por assento**. Tudo é editável no painel do dono, e o simulador recalcula na hora. **Valide impostos com
 > um contador antes de fixar preço** (detalhes no fim).
 
@@ -101,17 +102,17 @@ automática opcional. **Créditos do plano expiram no fim do ciclo** (deixe isso
 
 ## 5. Margem por plano (lucro bruto por assinante)
 
-Receita líquida = preço − 11% de impostos − 4% de gateway. Custo de API = créditos usados ÷ 1,5 (markup médio de 50%).
+Receita líquida = preço − 11% de impostos − 5% de Stripe. Custo de API = créditos usados ÷ 1,5 (markup médio de 50%).
 
 | Plano | 30% dos créditos usados | 60% | 100% (pior caso) |
 |---|---|---|---|
-| Starter (R$ 147) | R$ 88,95 (61%) | R$ 72,95 (50%) | R$ 51,62 (35%) |
-| Pro (R$ 447) | R$ 299,95 (67%) | R$ 239,95 (54%) | R$ 159,95 (36%) |
-| Max (R$ 997) | R$ 683,45 (69%) | R$ 539,45 (54%) | R$ 347,45 (35%) |
-| Equipe (por assento) | R$ 265,45 (67%) | R$ 213,45 (54%) | R$ 144,12 (36%) |
+| Starter (R$ 147) | R$ 87,48 (60%) | R$ 71,48 (49%) | R$ 50,15 (34%) |
+| Pro (R$ 447) | R$ 295,48 (66%) | R$ 235,48 (53%) | R$ 155,48 (35%) |
+| Max (R$ 997) | R$ 673,48 (68%) | R$ 529,48 (53%) | R$ 337,48 (34%) |
+| Equipe (por assento) | R$ 261,48 (66%) | R$ 209,48 (53%) | R$ 140,15 (35%) |
 
 Leitura: **mesmo se todo mundo gastar 100% dos créditos, a margem bruta fica em torno de 35%**; no uso típico (50–60%)
-fica perto de 54%. Recargas têm margem menor (~18% depois de impostos), porque a margem principal está na assinatura.
+fica perto de 53%. Recargas têm margem menor (~17% depois de impostos), porque a margem principal está na assinatura.
 Se quiser mais margem na recarga, suba o markup intermediário/avançado para 60% (a margem da recarga vai para ~22%).
 
 Esses números aparecem ao vivo no painel do dono (Visão geral e Planos e margem) e mudam quando você altera preço,
@@ -139,6 +140,16 @@ seu tempo e o marketing. Meta sugerida para os 3 primeiros meses: **30 assinante
 3. **Importação de serviço:** pagar as APIs no exterior pode gerar IOF (3,5% no cartão internacional) e, dependendo da
    forma de pagamento, IRRF, CIDE, PIS/Cofins-Importação e ISS. O "sobrecusto" de 15% é configurável justamente para
    refletir o número real.
-4. **Nota fiscal:** NFS-e a cada cobrança. O Asaas emite automaticamente.
+4. **Nota fiscal:** NFS-e a cada cobrança. A Stripe **não** emite NFS-e: use o app da NFE.io no marketplace da Stripe
+   (emite quando a fatura é paga) ou a API de um emissor (NFE.io, Focus NFe, PlugNotas) a partir do webhook. O emissor
+   precisa suportar o **padrão nacional da NFS-e** com os campos de IBS/CBS, obrigatório desde 01/01/2026.
 5. **Câmbio:** use a PTAX com folga de 3% (o painel busca no Banco Central com um clique) e revise semanalmente. Se o real
    desvalorizar 10% e você não atualizar, a margem cai na mesma proporção.
+6. **Stripe no Brasil (verificado em 04/11/2026):** assinatura só no **cartão (Visa/Mastercard) ou boleto**; o Pix
+   Automático **não** está disponível para empresas brasileiras na Stripe, então **Pix fica para as recargas** (pagamento
+   único). Sem Amex e sem parcelamento. O dinheiro do cartão nacional cai em **D+30** (Pix e boleto em D+2): incentive
+   recargas por Pix. **Boleto não tem estorno pela Stripe**: use boleto só para assinatura e fatura, e recargas por Pix ou
+   cartão. Os créditos devem ser de uso no próprio serviço e intransferíveis (não viram "saldo" de carteira).
+7. **Simples Nacional e NFS-e**: fontes do setor indicam que, desde 01/11/2026, ME/EPP do Simples emitem NFS-e
+   **somente pelo Emissor Nacional** (Resolução CGSN 191/2026). Confirme com o contador e escolha um emissor (ou
+   integração) compatível antes de ligar a cobrança.

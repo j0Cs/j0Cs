@@ -1,4 +1,4 @@
-import { computeChargeBrlMicros, formatBrlMicros, formatInt, formatTokens, plural } from "@forja/core";
+import { computeChargeBrlMicros, formatBrlMicros, formatInt, formatTokens, plural, VOICE_PRODUCTS } from "@forja/core";
 import { getPricingSettings, orgDailySpend, orgRecentUsage, orgUsageByModel, schema, startOfMonth, toCatalogModel } from "@forja/db";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, Stat, Table, Td, Th } from "@forja/ui";
 import { getSession } from "@/lib/session";
@@ -63,7 +63,7 @@ export default async function CostsPage() {
               <tbody>
                 {byModel.map((r) => (
                   <tr key={r.modelId}>
-                    <Td className="font-medium text-zinc-900">{r.displayName ?? r.modelId}</Td>
+                    <Td className="font-medium text-zinc-900">{r.displayName ?? VOICE_PRODUCTS[r.modelId]?.displayName ?? r.modelId}</Td>
                     <Td className="text-right tabular-nums">{formatInt(r.requests)}</Td>
                     <Td className="text-right tabular-nums">{formatTokens(r.inputTokens + r.cacheWriteTokens)}</Td>
                     <Td className="text-right tabular-nums">{formatTokens(r.cacheReadTokens)}</Td>
@@ -109,7 +109,7 @@ export default async function CostsPage() {
             {recent.map((e) => (
               <tr key={e.id}>
                 <Td>{e.createdAt.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}</Td>
-                <Td>{models.get(e.modelId)?.displayName ?? e.modelId}</Td>
+                <Td>{models.get(e.modelId)?.displayName ?? VOICE_PRODUCTS[e.modelId]?.displayName ?? e.modelId}</Td>
                 <Td>
                   {e.status === "ok" ? <Badge tone="green">ok</Badge> : e.status === "refused" ? <Badge tone="amber">recusado</Badge> : <Badge tone="red">erro</Badge>}
                 </Td>

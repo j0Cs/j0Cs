@@ -20,7 +20,8 @@ que funciona em produção (staging).
   organizações, convites por e-mail com limite de assentos, papéis dono/admin/membro
 - [x] Confirmação de e-mail obrigatória para usar os modelos (anti-abuso do teste grátis)
 - [x] Painel do dono com login próprio, **2FA obrigatório**, só contas "staff" e allowlist de IP (saiu o HTTP Basic)
-- [ ] E-mail transacional em produção: conta no Resend + domínio verificado (SPF/DKIM)
+- [x] E-mail transacional pelo **Microsoft 365** (Graph, caixa única) — falta a configuração no Microsoft 365 (prompt do Cowork pronto)
+- [x] Preparado para **Supabase + Vercel** (São Paulo, RLS, pool, migrações no build) — doc 6
 - [ ] Deploy de **staging**: Vercel (região GRU) + Postgres em São Paulo + variáveis no cofre
 - [ ] **Chaves reais dos 4 provedores** e smoke test com cada modelo (validar formatos de uso, principalmente xAI e Gemini)
 - [ ] Monitoramento de erros (Sentry) e logs estruturados do gateway
@@ -29,10 +30,12 @@ que funciona em produção (staging).
 
 ## Sprint 2: Dinheiro entrando (16/11 → 29/11)
 
-- [ ] **Asaas**: assinatura recorrente (cartão + Pix Automático + boleto), webhooks → créditos do plano a cada ciclo
-- [ ] Recargas avulsas e recarga automática; e-mail de saldo baixo (20% e 5%)
+- [ ] **Stripe**: assinatura no cartão ou boleto (Checkout + Billing), Customer Portal em pt-BR, webhooks idempotentes
+  (`invoice.paid` → créditos do plano a cada ciclo; `checkout.session.*` → recargas)
+- [ ] Recargas avulsas por **Pix** ou cartão; e-mail de saldo baixo (20% e 5%)
 - [ ] Inadimplência: aviso, carência de 3 dias e suspensão automática
-- [ ] Emissão automática de **NFS-e**
+- [ ] Emissão automática de **NFS-e** (NFE.io) no padrão nacional
+- [ ] Fim do teste grátis após 7 dias (hoje o limite efetivo é o saldo de R$ 10)
 - [ ] Página pública de preços + checkout + teste grátis de 7 dias (só modelos econômicos)
 - [ ] **Termos de uso, política de privacidade e DPA (LGPD)** revisados por advogado
 - [ ] Abrir/ajustar CNPJ e regime tributário com o contador (ver doc 3, seção 7)
@@ -57,6 +60,12 @@ que funciona em produção (staging).
 ## Recesso (24/12 → 03/01)
 
 Congelamento: só correção de bugs. Aproveite para gravar vídeos de demonstração e preparar a landing page.
+
+## Extra (pedido em 04/11): experiência imersiva ✅
+
+- [x] **Central de comando** pós-login (`/central`) com o Núcleo e os dois modos: escrever ou entrar na call
+- [x] **Modo call** com o agente Hefesto: voz, legendas, interrupção, especificação viva e "gerar projeto"
+- [ ] Voz em nuvem (natural, full-duplex) — ver doc 7
 
 ## Sprint 5: Beta fechado (04/01 → 17/01/2027)
 

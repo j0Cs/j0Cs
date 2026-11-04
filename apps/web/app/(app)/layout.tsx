@@ -1,7 +1,7 @@
 import { formatBrlMicros } from "@forja/core";
 import { Notice } from "@forja/ui";
 import { Shell } from "@forja/ui/shell";
-import { CreditCard, FolderKanban, Gauge, LogOut, Plug, Users } from "lucide-react";
+import { CreditCard, FolderKanban, Gauge, LogOut, Orbit, Plug, Users } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/session";
@@ -16,6 +16,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       brand={APP_NAME}
       tagline={org.name}
       nav={[
+        { href: "/central", label: "Central", icon: <Orbit size={16} /> },
         { href: "/projetos", label: "Projetos", icon: <FolderKanban size={16} /> },
         { href: "/conectores", label: "Conectores", icon: <Plug size={16} /> },
         { href: "/custos", label: "Custos e uso", icon: <Gauge size={16} /> },

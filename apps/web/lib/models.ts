@@ -31,3 +31,9 @@ export async function listModelOptions(db: Db, allowedTiers: ModelTier[]): Promi
     cacheReadBrlPerMTok: retailBrlPerMTok(m.pricing.cacheReadUsdMicrosPerMTok, settings, m.markupPercent),
   }));
 }
+
+/** Melhor modelo padrão liberado no plano (o teste grátis só tem os econômicos). */
+export function defaultModelFor(models: ModelOption[], preferidos = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"]) {
+  for (const id of preferidos) if (models.some((m) => m.id === id && m.allowed)) return id;
+  return models.find((m) => m.allowed)?.id ?? preferidos[0]!;
+}

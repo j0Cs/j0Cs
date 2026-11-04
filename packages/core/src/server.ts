@@ -7,3 +7,4 @@ export { anthropicAdapter } from "./providers/anthropic";
 export { googleAdapter } from "./providers/google";
 export { openaiAdapter, xaiAdapter } from "./providers/openai";
 export { verifyProviderKey } from "./providers/verify";
+export { createLiveSession, hangupLiveSession } from "./providers/live-openai";

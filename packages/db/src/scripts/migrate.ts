@@ -11,7 +11,15 @@ import { sslConfig } from "../client";
 const connectionString = process.env.DATABASE_URL_DIRECT ?? process.env.DATABASE_URL;
 if (!connectionString) throw new Error("Defina DATABASE_URL_DIRECT ou DATABASE_URL.");
 const pool = new pg.Pool({ connectionString, max: 1, ssl: sslConfig() });
-await migrate(drizzle(pool), { migrationsFolder: new URL("../../drizzle", import.meta.url).pathname });
+const client = await pool.connect();
+// Trava: os builds do app do cliente e do painel podem rodar ao mesmo tempo na Vercel.
+await client.query("select pg_advisory_lock(7212026)");
+try {
+  await migrate(drizzle(client), { migrationsFolder: new URL("../../drizzle", import.meta.url).pathname });
+} finally {
+  await client.query("select pg_advisory_unlock(7212026)");
+  client.release();
+}
 console.log("✔ migrações aplicadas");
 
 // Toda tabela do schema public precisa de RLS (a Supabase expõe public pela Data API).

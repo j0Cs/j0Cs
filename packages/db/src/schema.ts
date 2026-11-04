@@ -351,3 +351,29 @@ export const creditLedger = pgTable(
   },
   (t) => [index("credit_ledger_org_created_idx").on(t.orgId, t.createdAt)],
 );
+
+/**
+ * Chamadas de voz em nuvem (cobradas por segundo). O servidor cria a sessão no provedor,
+ * cobra a cada "pulso" do navegador e encerra (hangup) quando o saldo acaba ou o pulso some.
+ */
+export const voiceSessions = pgTable(
+  "voice_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+    providerId: providerIdEnum("provider_id").notNull(),
+    providerKeyId: uuid("provider_key_id"),
+    providerSessionId: text("provider_session_id").notNull(),
+    model: text("model").notNull(),
+    status: text("status").notNull().default("active"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    lastPulseAt: timestamp("last_pulse_at", { withTimezone: true }).notNull().defaultNow(),
+    billedSeconds: integer("billed_seconds").notNull().default(0),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    endReason: text("end_reason"),
+  },
+  (t) => [index("voice_sessions_status_idx").on(t.status, t.lastPulseAt), index("voice_sessions_org_idx").on(t.orgId)],
+);

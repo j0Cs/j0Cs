@@ -13,7 +13,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   const user = await getAuthUser();
   if (!user) redirect("/entrar");
   const orgs = await listUserOrganizations(getDb(), user.id);
-  if (orgs.length > 0 && !nova) redirect("/projetos");
+  if (orgs.length > 0 && !nova) redirect("/central");
 
   return (
     <>

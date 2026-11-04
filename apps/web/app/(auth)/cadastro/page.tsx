@@ -10,7 +10,7 @@ export const metadata = { title: "Criar conta" };
 
 export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ convite?: string }> }) {
   const { convite } = await searchParams;
-  if (await getAuthUser()) redirect(convite ? `/convite/${convite}` : "/projetos");
+  if (await getAuthUser()) redirect(convite ? `/convite/${convite}` : "/central");
   const invite = convite ? await getInvitation(getDb(), convite) : null;
 
   return (

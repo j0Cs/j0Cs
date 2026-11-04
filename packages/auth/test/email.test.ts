@@ -64,3 +64,26 @@ describe("sendEmail (Microsoft Graph)", () => {
     log.mockRestore();
   });
 });
+
+describe("sendEmail — limites do Microsoft 365", () => {
+  beforeEach(() => {
+    Object.assign(process.env, ENV);
+    resetEmailTokenCache();
+  });
+  afterEach(() => {
+    for (const k of Object.keys(ENV)) delete process.env[k];
+  });
+
+  it("respeita o Retry-After de um 429 e tenta de novo uma vez", async () => {
+    let envios = 0;
+    const f = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes("login.microsoftonline.com")) {
+        return new Response(JSON.stringify({ access_token: "tok", expires_in: 3600 }), { status: 200 });
+      }
+      envios++;
+      return envios === 1 ? new Response("calma", { status: 429, headers: { "retry-after": "0" } }) : new Response(null, { status: 202 });
+    }) as unknown as typeof fetch;
+    await sendEmail({ to: "a@x.com", subject: "1", html: "" }, f);
+    expect(envios).toBe(2);
+  });
+});

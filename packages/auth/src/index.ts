@@ -1,4 +1,5 @@
 import { getDb, schema } from "@forja/db";
+import { waitUntil } from "@vercel/functions";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
@@ -34,7 +35,14 @@ function baseOptions(baseURL: string, cookiePrefix: string) {
         twoFactors: schema.twoFactors,
       },
     }),
-    advanced: { database: { generateId: "uuid" }, cookiePrefix },
+    advanced: {
+      database: { generateId: "uuid" },
+      cookiePrefix,
+      // E-mails saem em segundo plano: a resposta não espera o envio (evita ataque por tempo
+      // de resposta) e, na Vercel, waitUntil garante que o envio termine.
+      backgroundTasks: { handler: (p) => waitUntil(p) },
+    },
+    account: { encryptOAuthTokens: true },
     user: {
       additionalFields: {
         platformRole: { type: "string", required: false, defaultValue: "customer", input: false },
