@@ -13,6 +13,19 @@ plano Pro** (o Hobby proíbe uso comercial e não aceita a varredura de voz a ca
 | Painel do dono | Vercel, projeto `forja-admin` (Root Directory `apps/admin`) | Git ligado a `j0Cs/j0Cs`, região `iad1` |
 | Variáveis públicas | os dois projetos | `NEXT_PUBLIC_APP_NAME=Forja`, `DATABASE_POOL_MAX=5` |
 
+**Primeiro build (04/11, commit `f5cac4d`)**: os dois falharam como esperado, por motivos que dependem de você:
+
+- `forja-web`: *"Hobby accounts are limited to daily cron jobs"*. O time Rampin Technology está no plano **Hobby**.
+  A varredura das calls de voz roda a cada minuto e precisa do **Pro**, que também é exigido para uso comercial.
+- `forja-admin`: instalou o monorepo e parou na migração (*"Defina DATABASE_URL_DIRECT ou DATABASE_URL"*), porque os
+  segredos do banco ainda não foram cadastrados.
+- A Vercel tratou a branch `claude/festive-galileo-oc97tw` como **produção** porque ela é a branch padrão do repositório
+  no GitHub. Depois do merge do PR, troque a branch de produção para `main` (Vercel → Settings → Environments →
+  Production → Branch Tracking, ou mude a branch padrão no GitHub). Até lá, cada push nessa branch é um deploy de
+  produção e roda as migrações no banco.
+
+Endereços de produção: `forja-web-rampin-tech.vercel.app` e `forja-admin-rampin-tech.vercel.app`.
+
 Os dois projetos estão com a **Vercel Authentication** ligada para tudo, menos domínios próprios. Enquanto não houver
 domínio, só membros do time Rampin abrem os endereços `.vercel.app`, o que serve como staging fechado.
 
