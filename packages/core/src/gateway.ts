@@ -55,7 +55,8 @@ export interface UsageRecord {
     voiceSeconds?: number;
   };
   latencyMs: number;
-  status: "ok" | "refused" | "error";
+  /** aborted = o cliente interrompeu (cobrado por estimativa); error = falha do provedor (não cobrado). */
+  status: "ok" | "refused" | "error" | "aborted";
   errorMessage?: string;
 }
 
@@ -147,6 +148,17 @@ export async function authorize(store: GatewayStore, req: GatewayChatRequest) {
   if (!allByok && access.balanceBrlMicros < settings.minBalanceBrlMicros) throw fail("insufficient_credits");
 
   return { model, settings, keys };
+}
+
+/**
+ * Estimativa de uso de uma resposta interrompida. A entrada é contada pelo tamanho do prompt
+ * (≈4 caracteres por token) e tratada como 70% lida do cache (prefixo estável), 30% nova.
+ */
+export function estimateAbortedUsage(req: Pick<GatewayChatRequest, "system" | "messages">, outputChars: number): NormalizedUsage {
+  const chars = (req.system?.length ?? 0) + req.messages.reduce((n, m) => n + m.content.length, 0);
+  const entrada = Math.ceil(chars / 4);
+  const cache = Math.floor(entrada * 0.7);
+  return { inputTokens: entrada - cache, cacheReadTokens: cache, cacheWriteTokens: 0, outputTokens: Math.ceil(outputChars / 4) };
 }
 
 export async function* runChat(deps: GatewayDeps, req: GatewayChatRequest): AsyncGenerator<GatewayEvent> {
@@ -243,8 +255,35 @@ export async function* runChat(deps: GatewayDeps, req: GatewayChatRequest): Asyn
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const isLastKey = i === keys.length - 1;
+
+      // O cliente interrompeu (falou por cima do agente, fechou a aba): o provedor já cobrou a entrada
+      // e o que foi gerado, então cobramos uma ESTIMATIVA (≈4 caracteres por token).
+      if (req.signal?.aborted) {
+        const usage = estimateAbortedUsage(req, emittedChars);
+        const byok = key.byok === true;
+        const costUsdMicros = byok ? 0 : computeCostUsdMicros(usage, model.pricing);
+        await deps.store.recordUsage({
+          ...base,
+          servedModelId: model.id,
+          providerKeyId: key.id,
+          usage,
+          costUsdMicros,
+          chargeBrlMicros: byok ? 0 : computeChargeBrlMicros(costUsdMicros, settings, model.markupPercent),
+          pricingSnapshot: {
+            fxUsdBrl: settings.fxUsdBrl,
+            costOverheadPercent: settings.costOverheadPercent,
+            markupPercent: model.markupPercent,
+            byok,
+          },
+          latencyMs: now() - startedAt,
+          status: "aborted",
+          errorMessage: "interrompida pelo cliente (uso estimado)",
+        });
+        return;
+      }
+
       // Sem texto emitido ainda → dá para tentar a próxima chave do pool sem o cliente perceber.
-      if (!emittedText && !isLastKey && !req.signal?.aborted) continue;
+      if (!emittedText && !isLastKey) continue;
 
       // Falha do provedor não é cobrada do cliente; registramos uma estimativa do
       // custo parcial (≈4 caracteres por token de saída) para a conciliação do dono.

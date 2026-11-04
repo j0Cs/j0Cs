@@ -101,8 +101,15 @@ async function medidorDeMicrofone() {
   };
 }
 
+/** Síntese de fala, se existir (WebViews de apps como Instagram e Facebook não têm). */
+const sintese = (): SpeechSynthesis | undefined => (typeof window !== "undefined" ? window.speechSynthesis : undefined);
+
+/** Erros do reconhecimento que não se resolvem tentando de novo em seguida. */
+const ERROS_PERSISTENTES = new Set(["network", "audio-capture", "language-not-supported"]);
+const MAX_FALHAS_RECONHECIMENTO = 5;
+
 function escolherVoz(): SpeechSynthesisVoice | null {
-  const vozes = window.speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("pt-br"));
+  const vozes = (sintese()?.getVoices() ?? []).filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("pt-br"));
   const preferidas = ["Google", "Francisca", "Thalita", "Antonio", "Luciana", "Microsoft"];
   for (const p of preferidas) {
     const v = vozes.find((x) => x.name.includes(p));
@@ -125,9 +132,12 @@ export function criarMotorNavegador(): MotorDeVoz {
   let textoFinal = "";
   let timerTurno: ReturnType<typeof setTimeout> | null = null;
   let avisouFalhaDeVoz = false;
+  /** Falhas seguidas do reconhecimento (ex.: Brave responde "network" sempre). */
+  let falhasReconhecimento = 0;
+  let reconhecimentoDesistiu = false;
 
   const ouvir = () => {
-    if (!rec || !ativo || mudo || falandoAgora || ouvindo) return;
+    if (!rec || !ativo || mudo || falandoAgora || ouvindo || reconhecimentoDesistiu) return;
     try {
       rec.start();
       ouvindo = true;
@@ -151,12 +161,31 @@ export function criarMotorNavegador(): MotorDeVoz {
     if (texto) eventos?.onFinal(texto);
   };
 
+  const avisarFalhaDeVoz = () => {
+    if (avisouFalhaDeVoz) return;
+    avisouFalhaDeVoz = true;
+    eventos?.onErro("O navegador não conseguiu reproduzir a voz do agente. As respostas continuam aparecendo na legenda.");
+  };
+
   const falarProxima = () => {
+    if (!ativo) {
+      fila = [];
+      falandoAgora = false;
+      return;
+    }
     const frase = fila.shift();
     if (!frase) {
       falandoAgora = false;
       eventos?.onFimDaFala();
       ouvir();
+      return;
+    }
+    const s = sintese();
+    if (!s) {
+      // sem síntese de fala: a frase vai só para a legenda
+      avisarFalhaDeVoz();
+      eventos?.onFrase(frase);
+      falarProxima();
       return;
     }
     falandoAgora = true;
@@ -173,13 +202,10 @@ export function criarMotorNavegador(): MotorDeVoz {
     };
     u.onend = () => falarProxima();
     u.onerror = (e) => {
-      if (e.error !== "interrupted" && e.error !== "canceled" && !avisouFalhaDeVoz) {
-        avisouFalhaDeVoz = true;
-        eventos?.onErro("O navegador não conseguiu reproduzir a voz do agente. As respostas continuam aparecendo na legenda.");
-      }
+      if (e.error !== "interrupted" && e.error !== "canceled") avisarFalhaDeVoz();
       falarProxima();
     };
-    window.speechSynthesis.speak(u);
+    s.speak(u);
   };
 
   return {
@@ -189,12 +215,19 @@ export function criarMotorNavegador(): MotorDeVoz {
       eventos = ev;
       ativo = true;
       try {
-        medidor = await medidorDeMicrofone();
+        const m = await medidorDeMicrofone();
+        // a call foi encerrada enquanto o navegador pedia permissão: não deixa o microfone ligado
+        if (!ativo) {
+          m.fechar();
+          return;
+        }
+        medidor = m;
       } catch {
+        if (!ativo) return;
         ev.onErro("Sem acesso ao microfone. Libere o microfone no navegador ou digite suas mensagens.");
       }
-      // algumas vozes só aparecem depois deste evento
-      window.speechSynthesis.getVoices();
+      // algumas vozes só aparecem depois desta chamada
+      sintese()?.getVoices();
       if (!Rec) {
         ev.onErro("Este navegador não reconhece fala. Use Chrome ou Edge, ou digite suas mensagens.");
         return;
@@ -204,6 +237,7 @@ export function criarMotorNavegador(): MotorDeVoz {
       rec.continuous = true;
       rec.interimResults = true;
       rec.onresult = (e) => {
+        falhasReconhecimento = 0;
         let parcial = "";
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const r = e.results[i]!;
@@ -218,26 +252,32 @@ export function criarMotorNavegador(): MotorDeVoz {
       rec.onerror = (e) => {
         if (e.error === "not-allowed" || e.error === "service-not-allowed") {
           ev.onErro("O navegador bloqueou o reconhecimento de voz. Libere o microfone ou digite suas mensagens.");
-          ativo = false;
+          reconhecimentoDesistiu = true;
+        } else if (ERROS_PERSISTENTES.has(e.error) && ++falhasReconhecimento >= MAX_FALHAS_RECONHECIMENTO) {
+          reconhecimentoDesistiu = true;
+          ev.onErro("O reconhecimento de voz não está funcionando neste navegador. Digite suas mensagens ou use Chrome ou Edge.");
         }
       };
       rec.onend = () => {
         ouvindo = false;
-        // o Chrome encerra o reconhecimento após silêncio: reinicia enquanto a call estiver ativa
-        if (ativo && !falandoAgora && !mudo) setTimeout(ouvir, 150);
+        // o Chrome encerra o reconhecimento após silêncio: reinicia enquanto a call estiver ativa,
+        // esperando mais a cada falha seguida (150 ms, 300 ms, 600 ms… até 5 s)
+        if (ativo && !falandoAgora && !mudo && !reconhecimentoDesistiu) {
+          setTimeout(ouvir, Math.min(5_000, 150 * 2 ** falhasReconhecimento));
+        }
       };
       ouvir();
     },
 
     falar(frase) {
-      if (!frase.trim()) return;
+      if (!ativo || !frase.trim()) return;
       fila.push(frase);
       if (!falandoAgora) falarProxima();
     },
 
     calar() {
       fila = [];
-      window.speechSynthesis.cancel();
+      sintese()?.cancel();
       falandoAgora = false;
       ouvir();
     },
@@ -262,9 +302,10 @@ export function criarMotorNavegador(): MotorDeVoz {
       ativo = false;
       fila = [];
       if (timerTurno) clearTimeout(timerTurno);
-      window.speechSynthesis?.cancel();
+      sintese()?.cancel();
       pararDeOuvir();
       medidor?.fechar();
+      medidor = null;
     },
   };
 }

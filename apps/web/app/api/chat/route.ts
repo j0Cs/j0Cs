@@ -31,9 +31,11 @@ export async function POST(request: Request) {
     message?: string;
     /** "call" = chamada de voz: respostas curtas, faladas, sem markdown. */
     modo?: string;
+    /** Responder à última mensagem do usuário já gravada (pedido vindo da Central). */
+    responderUltima?: boolean;
   };
-  const text = body.message?.trim();
-  if (!body.projectId || !body.modelId || !text) {
+  const text = body.message?.trim().slice(0, 20_000);
+  if (!body.projectId || !body.modelId || (!text && !body.responderUltima)) {
     return new Response("Requisição inválida.", { status: 400 });
   }
 
@@ -54,18 +56,20 @@ export async function POST(request: Request) {
     throw err;
   }
 
+  if (body.responderUltima && !body.conversationId) return new Response("Requisição inválida.", { status: 400 });
   let conversation = body.conversationId
     ? await db.query.conversations.findFirst({
         where: and(eq(schema.conversations.id, body.conversationId), eq(schema.conversations.orgId, org.id)),
       })
     : undefined;
+  if (!conversation && body.responderUltima) return new Response("Conversa não encontrada.", { status: 404 });
   if (!conversation) {
     [conversation] = await db
       .insert(schema.conversations)
       .values({
         orgId: org.id,
         projectId: project.id,
-        title: text.length > 60 ? `${text.slice(0, 57)}…` : text,
+        title: text!.length > 60 ? `${text!.slice(0, 57)}…` : text!,
         modelId: body.modelId,
         createdBy: user.id,
       })
@@ -73,7 +77,9 @@ export async function POST(request: Request) {
   }
   const conv = conversation!;
 
-  await db.insert(schema.messages).values({ conversationId: conv.id, role: "user", content: text });
+  if (!body.responderUltima) {
+    await db.insert(schema.messages).values({ conversationId: conv.id, role: "user", content: text! });
+  }
 
   const rows = await db
     .select({ role: schema.messages.role, content: schema.messages.content })
@@ -82,6 +88,10 @@ export async function POST(request: Request) {
     .orderBy(asc(schema.messages.createdAt));
   const history: ChatMessage[] = rows.slice(-HISTORY_LIMIT).filter((m) => m.content.trim());
   while (history[0]?.role === "assistant") history.shift();
+  // só responde se a última fala for do usuário (evita respostas duplicadas)
+  if (body.responderUltima && history.at(-1)?.role !== "user") {
+    return new Response("Nada a responder.", { status: 409 });
+  }
 
   const call = body.modo === "call";
   const base = call ? callSystemPrompt(firstName(user.name)) : BASE_SYSTEM;
@@ -91,7 +101,14 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (event: unknown) => controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+      // Se o cliente desconectar, enqueue lança: ignoramos e seguimos até o gateway registrar o uso.
+      const send = (event: unknown) => {
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        } catch {
+          // cliente saiu
+        }
+      };
       send({ type: "conversation", id: conv.id });
       let answer = "";
       try {
@@ -129,7 +146,11 @@ export async function POST(request: Request) {
         console.error("[chat]", err);
         send({ type: "error", code: "internal", message: "Erro interno. Tente novamente." });
       } finally {
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // já fechado pelo cliente
+        }
       }
     },
   });

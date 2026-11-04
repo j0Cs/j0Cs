@@ -36,25 +36,39 @@ navegador ──SDP──► /api/call/voz/sessao ──(nossa chave)──► O
     │                                                           │
     │◄────────────── áudio WebRTC direto ───────────────────────┘
     │
-    ├─ a cada 15 s: /api/call/voz/pulso  → cobra os segundos; saldo < 1 minuto → desliga (hangup)
+    ├─ a cada 15 s: /api/call/voz/pulso  → cobra os segundos; saldo < 1 minuto → desliga
     ├─ delegação: /api/chat (modo call)  → modelo escolhido, cobrado por token
     └─ fim: /api/call/voz/fim            → cobra até agora e desliga
 
-Vercel Cron (1/min): /api/cron/voz → chamadas sem pulso há 60 s são cobradas até o último pulso + 15 s e desligadas
+Desligar = servidor conecta no canal lateral wss://…/live/sessions/{id}/attach, envia session.close e espera
+session.closed (com os segundos que a OpenAI cobrou, registrados no log para conciliação); se falhar, tenta o
+endpoint REST de hangup.
+
+Vercel Cron (1/min): /api/cron/voz
+    ├─ "active" sem pulso há 30 s     → cobra até agora e desliga
+    ├─ "closing" (desligar falhou)    → tenta de novo; não cobra mais nada do cliente
+    └─ "connecting" parada há 2 min   → reserva órfã, libera
 ```
 
 - A chave da OpenAI **nunca** vai ao navegador: quem cria a sessão é o servidor.
 - O navegador só pode mandar uma lista fechada de eventos pelo canal de dados (`allowed_client_events`).
 - A cobrança usa o relógio do servidor, não o que o navegador informa; um "claim" no banco impede cobrança dupla
   entre o pulso e a varredura.
-- Para abrir a call é preciso saldo para 2 minutos de voz.
+- **Uma call aberta por pessoa** (índice único no banco) e saldo para 2 minutos de voz para abrir.
+- Quando pedimos o fim, a cobrança do cliente para ali (`ended_at`). Se o desligamento no provedor falhar, o tempo
+  extra é custo da plataforma. Depois de 10 minutos tentando, ou se a chave que abriu a call foi apagada, a call é
+  fechada mesmo assim com alerta `critical` no log, para não prender o usuário. Por isso o painel não deixa apagar
+  uma chave com call em andamento: desative e apague depois.
+- Sair da sala durante "Conectando…" cancela a conexão e fecha a sessão sem cobrar; quedas curtas de rede (até 10 s)
+  não derrubam a call.
 - `CRON_SECRET` precisa estar definido no projeto `forja-web` da Vercel (a Vercel o envia na varredura). O cron só roda
   em deploys de **produção**; em prévias de PR, a proteção fica por conta do pulso e do desligamento por queda de conexão.
 
 ## O que ainda precisa de uma chave real para validar
 
-O GPT-Live é recente (GA em 10/09/2026). A criação da sessão, o pulso, o corte por saldo, o fim e a varredura foram
-testados com um servidor que imita a OpenAI. Os nomes dos eventos do canal de dados (legendas, delegação,
+O GPT-Live é recente (GA em 10/09/2026). A criação da sessão, o pulso, o corte por saldo, o fim pelo canal lateral, a
+varredura e o cancelamento no meio da conexão foram testados com um servidor que imita a OpenAI. Os nomes dos eventos do canal de dados (legendas, delegação,
 encerramento) seguem a documentação de 04/11/2026 e estão concentrados em `components/oficina/voz-nuvem.ts`
 (`EVENTOS`). No primeiro teste com a chave real, confira: delegação → resposta falada, legendas em pt-BR e
-qualidade da voz `bossa` com nomes e números.
+qualidade da voz `bossa` com nomes e números, e se o `session.close` pelo canal lateral derruba a call do
+navegador na hora (o log "call desligada" mostra `via: sideband` ou `via: hangup`).

@@ -43,8 +43,8 @@ export function Chat(props: {
   initialMessages: Msg[];
   models: ModelOption[];
   defaultModelId: string;
-  /** Pedido vindo da Central (modo escrever): enviado automaticamente uma vez. */
-  initialPrompt?: string;
+  /** A última mensagem (vinda da Central) ainda não tem resposta: pede ao modelo uma vez. */
+  responderPendente?: boolean;
 }) {
   const router = useRouter();
   const [messages, setMessages] = useState<Msg[]>(props.initialMessages);
@@ -70,22 +70,23 @@ export function Chat(props: {
 
   const autoSent = useRef(false);
   useEffect(() => {
-    if (props.initialPrompt && !autoSent.current && messages.length === 0) {
+    if (props.responderPendente && !autoSent.current) {
       autoSent.current = true;
-      void send(props.initialPrompt);
+      window.history.replaceState(null, "", `/projetos/${props.projectId}?c=${props.conversationId}`);
+      void send(undefined, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function send(override?: string) {
+  async function send(override?: string, responderUltima = false) {
     const text = (override ?? input).trim();
-    if (!text || busy) return;
+    if ((!text && !responderUltima) || busy) return;
     setInput("");
     setBusy(true);
     const assistantId = crypto.randomUUID();
     setMessages((m) => [
       ...m,
-      { id: crypto.randomUUID(), role: "user", content: text },
+      ...(responderUltima ? [] : [{ id: crypto.randomUUID(), role: "user" as const, content: text }]),
       { id: assistantId, role: "assistant", content: "", modelId },
     ]);
     const patch = (fn: (msg: Msg) => Msg) =>
@@ -101,7 +102,8 @@ export function Chat(props: {
           conversationId: conversationId.current,
           modelId,
           effort,
-          message: text,
+          message: responderUltima ? undefined : text,
+          responderUltima,
         }),
         signal: abort.current.signal,
       });

@@ -59,6 +59,11 @@ export function CallRoom(props: {
 
   const motor = useRef<MotorDeVoz | null>(null);
   const nuvem = useRef<ChamadaNuvem | null>(null);
+  /** Chamada em nuvem ainda conectando (para cancelar se a pessoa sair da página). */
+  const nuvemConectando = useRef<ChamadaNuvem | null>(null);
+  /** false depois que a sala sai da tela: nada mais fala, cobra ou atualiza estado. */
+  const montado = useRef(true);
+  const delegacaoAbort = useRef<AbortController | null>(null);
   const projectId = useRef<string | null>(props.projeto?.id ?? null);
   const conversationId = useRef<string | null>(null);
   const abort = useRef<AbortController | null>(null);
@@ -68,7 +73,7 @@ export function CallRoom(props: {
   specRef.current = spec;
   const specEmVoo = useRef(false);
   const specPendente = useRef(false);
-  const transcricaoFim = useRef<HTMLDivElement>(null);
+  const transcricaoCaixa = useRef<HTMLDivElement>(null);
 
   useEffect(() => setSuporte(suporteDoNavegador()), []);
   useEffect(() => {
@@ -77,15 +82,21 @@ export function CallRoom(props: {
     return () => clearInterval(id);
   }, [fase]);
   useEffect(() => {
-    transcricaoFim.current?.scrollIntoView({ block: "end" });
+    // rola só a caixa da transcrição (scrollIntoView puxaria a página inteira no celular)
+    const caixa = transcricaoCaixa.current;
+    if (caixa) caixa.scrollTop = caixa.scrollHeight;
   }, [linhas]);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      // saiu da sala (Voltar, botão voltar do navegador): corta resposta, fala e chamada
+      montado.current = false;
+      abort.current?.abort();
+      delegacaoAbort.current?.abort();
       motor.current?.encerrar();
-      void nuvem.current?.encerrar();
-    },
-    [],
-  );
+      void (nuvem.current ?? nuvemConectando.current)?.encerrar();
+    };
+  }, []);
 
   const nivel = () => {
     const fonte = nuvem.current ?? motor.current;
@@ -94,7 +105,7 @@ export function CallRoom(props: {
   const nomeModelo = props.modelos.find((m) => m.id === modelo)?.nome ?? modelo;
 
   async function atualizarSpec() {
-    if (!conversationId.current) return;
+    if (!conversationId.current || !montado.current) return;
     if (specEmVoo.current) {
       specPendente.current = true;
       return;
@@ -191,10 +202,11 @@ export function CallRoom(props: {
         }
       }
       recebendo.current = false;
+      if (!montado.current) return;
       if (!falou || !m.falando()) setModo("ouvindo");
       void atualizarSpec();
     } catch (e) {
-      if ((e as Error).name === "AbortError") return;
+      if ((e as Error).name === "AbortError" || !montado.current) return;
       setLinhas((l) => l.filter((x) => x.id !== idAgente || x.texto));
       setModo("ouvindo");
       if (e instanceof ErroHttp && e.status === 402) {
@@ -213,13 +225,18 @@ export function CallRoom(props: {
 
   /** Voz em nuvem: o modelo de voz pediu raciocínio; respondemos pelo nosso gateway. */
   async function delegar(id: string, pedido: string) {
-    if (!pedido.trim()) return;
+    if (!pedido.trim() || !montado.current) return;
     setModo("pensando");
+    // uma delegação nova substitui a anterior (a pessoa mudou de assunto no meio)
+    delegacaoAbort.current?.abort();
+    const ctrl = new AbortController();
+    delegacaoAbort.current = ctrl;
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ projectId: projectId.current, conversationId: conversationId.current, modelId: modelo, message: pedido, modo: "call" }),
+        signal: ctrl.signal,
       });
       if (!res.ok || !res.body) throw new ErroHttp(res.status, (await res.text()) || `Erro ${res.status}`);
       const reader = res.body.getReader();
@@ -240,14 +257,19 @@ export function CallRoom(props: {
           else if (ev.type === "error") throw new Error(ev.message);
         }
       }
+      if (ctrl.signal.aborted) return;
       nuvem.current?.responder(id, resposta || "Não consegui pensar numa resposta agora. Pode repetir?");
       void atualizarSpec();
     } catch (e) {
+      if (ctrl.signal.aborted || !montado.current) return;
       const msg = e instanceof ErroHttp && e.status === 402 ? "Seu saldo de créditos acabou." : (e as Error).message;
       setErro(msg);
       nuvem.current?.responder(id, "Tive um problema para pensar nisso agora. Vamos tentar de novo em instantes.");
     } finally {
-      setModo("ouvindo");
+      if (delegacaoAbort.current === ctrl) {
+        delegacaoAbort.current = null;
+        if (montado.current) setModo("ouvindo");
+      }
     }
   }
 
@@ -264,6 +286,8 @@ export function CallRoom(props: {
       onDelegacao: (id, pedido) => void delegar(id, pedido),
       onEncerrada: (motivo) => {
         nuvem.current = null;
+        delegacaoAbort.current?.abort();
+        if (!montado.current) return;
         setFase("encerrada");
         setModo("repouso");
         setLegenda(null);
@@ -273,8 +297,14 @@ export function CallRoom(props: {
       onCobranca: (b) => setCusto((c) => c + b),
       onErro: (msg) => setErro(msg),
     });
+    nuvemConectando.current = c;
     try {
       const r = await c.iniciar(props.projeto?.id ?? "nova");
+      nuvemConectando.current = null;
+      if (!montado.current) {
+        void c.encerrar();
+        return;
+      }
       nuvem.current = c;
       projectId.current = r.projectId;
       conversationId.current = r.conversationId;
@@ -283,6 +313,8 @@ export function CallRoom(props: {
       setFase("ativa");
       setModo("ouvindo");
     } catch (e) {
+      nuvemConectando.current = null;
+      if (!montado.current || (e instanceof ErroDeVoz && e.cancelada)) return;
       const msg = e instanceof ErroDeVoz ? e.message : "Não foi possível acessar o microfone ou conectar a voz natural.";
       if (!(e instanceof ErroDeVoz)) console.error("[voz]", e);
       setErro(`${msg} Tente de novo ou escolha a voz do navegador.`);
@@ -296,7 +328,8 @@ export function CallRoom(props: {
     if (tipoVoz === "nuvem") return entrarNaNuvem();
     const m = criarMotorNavegador();
     motor.current = m;
-    await m.iniciar({
+    try {
+      await m.iniciar({
       onParcial: (texto) => {
         if (m.falando()) return;
         setLegenda({ quem: "voce", texto });
@@ -312,7 +345,18 @@ export function CallRoom(props: {
         if (!recebendo.current) setModo("ouvindo");
       },
       onErro: (msg) => setErro(msg),
-    });
+      });
+    } catch (e) {
+      console.error("[voz]", e);
+      m.encerrar();
+      motor.current = null;
+      if (!montado.current) return;
+      setErro("Não foi possível iniciar a voz neste navegador. Tente o Chrome ou o Edge.");
+      setFase("sala");
+      return;
+    }
+    // saiu da sala enquanto o navegador pedia o microfone: não cumprimenta ninguém
+    if (!montado.current || motor.current !== m) return;
     setInicio(Date.now());
     setAgora(Date.now());
     setFase("ativa");
@@ -476,14 +520,27 @@ export function CallRoom(props: {
             {spec.titulo || "Especificação da call"}
           </h1>
         </div>
+        {erro ? (
+          <p className="rounded-md border border-brasa/40 bg-brasa/10 px-3 py-2 text-center text-sm text-brasa-claro">
+            {erro}
+            {/saldo/i.test(erro) ? (
+              <>
+                {" "}
+                <Link href="/plano" className="underline underline-offset-2 hover:text-aco-100">
+                  Recarregar créditos
+                </Link>
+              </>
+            ) : null}
+          </p>
+        ) : null}
         {painelSpec}
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
           <button
-            disabled={concluindo || !projectId.current}
+            disabled={concluindo || atualizandoSpec || !projectId.current}
             onClick={() => iniciarConclusao(() => concluirCall({ projectId: projectId.current!, spec }))}
             className="rounded-md bg-brasa px-6 py-2.5 text-sm font-semibold text-aco-950 hover:bg-brasa-claro disabled:opacity-50"
           >
-            {concluindo ? "Gerando…" : "Gerar projeto com esta especificação"}
+            {concluindo ? "Gerando…" : atualizandoSpec ? "Finalizando a especificação…" : "Gerar projeto com esta especificação"}
           </button>
           <Link href="/central" className="rounded-md border border-aco-700 px-6 py-2.5 text-center text-sm text-aco-300 hover:text-aco-100">
             Voltar à central
@@ -520,7 +577,7 @@ export function CallRoom(props: {
       <div className="grid flex-1 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(0,320px)]">
         <section className="order-3 min-h-0 lg:order-1" aria-label="Transcrição">
           <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-aco-400">Transcrição</p>
-          <div className="max-h-[40vh] space-y-3 overflow-y-auto pr-1 text-sm lg:max-h-[calc(100dvh-12rem)]">
+          <div ref={transcricaoCaixa} className="max-h-[40vh] space-y-3 overflow-y-auto pr-1 text-sm lg:max-h-[calc(100dvh-12rem)]">
             {linhas
               .filter((l) => l.texto)
               .map((l) => (
@@ -531,7 +588,6 @@ export function CallRoom(props: {
                   {l.texto}
                 </p>
               ))}
-            <div ref={transcricaoFim} />
           </div>
         </section>
 

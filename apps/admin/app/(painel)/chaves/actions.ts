@@ -2,7 +2,7 @@
 
 import type { ProviderId } from "@forja/core";
 import { encryptSecret, secretHint, verifyProviderKey } from "@forja/core/server";
-import { eq, schema } from "@forja/db";
+import { and, eq, ne, schema } from "@forja/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { adminDb, num, requireStaff } from "@/lib/admin";
@@ -48,6 +48,16 @@ export async function setPriority(formData: FormData) {
 
 export async function deleteKey(formData: FormData) {
   await requireStaff();
-  await (await adminDb()).delete(schema.providerKeys).where(eq(schema.providerKeys.id, String(formData.get("id"))));
+  const db = await adminDb();
+  const id = String(formData.get("id"));
+  // A chave que abriu uma call de voz é a única que consegue desligá-la no provedor.
+  const emUso = await db.query.voiceSessions.findFirst({
+    where: and(eq(schema.voiceSessions.providerKeyId, id), ne(schema.voiceSessions.status, "closed")),
+    columns: { id: true },
+  });
+  if (emUso) {
+    redirect(`/chaves?erro=${encodeURIComponent("Há uma call de voz usando esta chave agora. Desative a chave e apague quando a call terminar.")}`);
+  }
+  await db.delete(schema.providerKeys).where(eq(schema.providerKeys.id, id));
   revalidatePath("/chaves");
 }

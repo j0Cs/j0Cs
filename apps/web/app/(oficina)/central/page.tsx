@@ -20,8 +20,13 @@ const CONECTORES = [
   { type: "postgres", nome: "Postgres" },
 ];
 
+/** Só mensagens conhecidas: texto livre na URL viraria um aviso "oficial" forjado. */
+const AVISOS: Record<string, string> = {
+  "limite-projetos": "Seu plano chegou ao limite de projetos ativos. Escolha um projeto existente ou arquive um no painel.",
+};
+
 export default async function CentralPage({ searchParams }: { searchParams: Promise<{ aviso?: string }> }) {
-  const { aviso } = await searchParams;
+  const aviso = AVISOS[(await searchParams).aviso ?? ""];
   const { db, org, plan, user } = await getSession();
   const [projetos, conectores, modelos] = await Promise.all([
     db

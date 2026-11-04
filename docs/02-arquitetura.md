@@ -11,7 +11,7 @@ flowchart LR
     WEB[apps/web<br/>Next.js: área do cliente]
     ADM[apps/admin<br/>Next.js: painel do dono]
     CORE[packages/core<br/>gateway de IA + precificação + cripto]
-    DB[(Postgres<br/>São Paulo)]
+    DB[(Postgres<br/>Supabase us-east-1)]
   end
   subgraph Provedores de IA
     A[Anthropic]
@@ -91,7 +91,7 @@ Regras que estão no código e cobertas por testes (`packages/core/test`):
 | Login | **Better Auth** (`packages/auth`): e-mail e senha, link mágico, GitHub OAuth, 2FA no painel. Organizações e convites são nossos (`packages/db/src/orgs.ts`) | Usuários ficam no seu banco, sem lock-in nem custo por usuário | Supabase Auth, Clerk (pago por usuário ativo) |
 | Pagamentos | **Stripe** (conta brasileira): assinatura no cartão ou boleto, recargas com Pix ou cartão, Customer Portal; NFS-e via NFE.io (app da Stripe ou API) | Escolha do dono; API madura, portal pronto, serve para vender fora depois | Asaas (tem Pix Automático e NFS-e embutidos), Pagar.me, Iugu |
 | E-mail | **Microsoft 365** (Graph `sendMail`, caixa única via RBAC para Aplicativos) — doc 5 | Já é a ferramenta da empresa; sem custo extra | Resend, provedor dedicado (quando o volume crescer) |
-| Hospedagem e banco | **Vercel Pro (gru1) + Supabase Pro (sa-east-1)** — doc 6 | Mesma região AWS em São Paulo; já usados pelo dono | Railway/Fly + Neon |
+| Hospedagem e banco | **Vercel Pro (iad1) + Supabase Pro (us-east-1)** — doc 6 | App e banco na mesma região AWS (Virgínia), compute mais barato; já usados pelo dono | Railway/Fly + Neon; ou `gru1` + `sa-east-1` se clientes exigirem dados no Brasil |
 | Tarefas longas de agente | Fila de jobs (Inngest ou Trigger.dev) + sandbox (E2B, Vercel Sandbox ou Daytona), na fase 2 | Funções serverless têm tempo máximo; agente que roda testes precisa de contêiner | Servidor próprio com Docker |
 
 ## Segurança

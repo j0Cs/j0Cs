@@ -125,6 +125,28 @@ describe("runChat", () => {
     expect(balance()).toBe(10_000_000);
   });
 
+  it("cobra uma estimativa quando o cliente interrompe a resposta", async () => {
+    const { store, records, balance } = memoryStore();
+    const ctrl = new AbortController();
+    const adapter: ProviderAdapter = {
+      id: "anthropic",
+      async *stream() {
+        yield { type: "text", text: "x".repeat(400) };
+        ctrl.abort();
+        throw new Error("Request was aborted.");
+      },
+    };
+    const events = await collect(
+      runChat({ store, adapters: { anthropic: adapter } }, { ...req, system: "s".repeat(4000), signal: ctrl.signal }),
+    );
+    expect(events.some((e) => e.type === "error")).toBe(false);
+    expect(records[0]?.status).toBe("aborted");
+    // entrada ≈ (4000 + 2) / 4 = 1001 tokens → 700 do cache + 301 novos; saída = 100
+    expect(records[0]?.usage).toEqual({ inputTokens: 301, cacheReadTokens: 700, cacheWriteTokens: 0, outputTokens: 100 });
+    expect(records[0]?.chargeBrlMicros).toBeGreaterThan(0);
+    expect(balance()).toBeLessThan(10_000_000);
+  });
+
   it("precifica cada tentativa pelo modelo que rodou (fallback)", async () => {
     const { store, records } = memoryStore();
     const adapter: ProviderAdapter = {

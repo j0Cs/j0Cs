@@ -2,6 +2,7 @@
 
 import { and, eq, schema } from "@forja/db";
 import { redirect } from "next/navigation";
+import { defaultModelFor, listModelOptions } from "@/lib/models";
 import { garantirProjeto } from "@/lib/projects";
 import { getSession } from "@/lib/session";
 
@@ -9,16 +10,28 @@ import { getSession } from "@/lib/session";
 export async function ensureProject(projetoId: string, nomeSugerido: string) {
   const { db, org, plan, user } = await getSession();
   const r = await garantirProjeto(db, { orgId: org.id, userId: user.id, maxProjects: plan?.maxProjects }, projetoId, nomeSugerido);
-  if ("erro" in r) redirect(`/central?aviso=${encodeURIComponent(r.erro)}`);
+  if ("erro" in r) redirect("/central?aviso=limite-projetos");
   return r.id;
 }
 
-/** Modo escrever: abre (ou cria) o projeto e já envia o primeiro pedido. */
+/**
+ * Modo escrever: grava o pedido como primeira mensagem de uma conversa nova e abre o chat,
+ * que pede a resposta ao modelo. (Nada de "?q=" na URL: um link externo não dispara gasto.)
+ */
 export async function comecarEscrevendo(formData: FormData) {
-  const pedido = String(formData.get("pedido") ?? "").trim();
+  const pedido = String(formData.get("pedido") ?? "").trim().slice(0, 4000);
   if (!pedido) redirect("/central");
   const id = await ensureProject(String(formData.get("projeto") ?? "nova"), pedido);
-  redirect(`/projetos/${id}?q=${encodeURIComponent(pedido.slice(0, 4000))}`);
+  const { db, org, plan, user } = await getSession();
+  const projeto = await db.query.projects.findFirst({ where: and(eq(schema.projects.id, id), eq(schema.projects.orgId, org.id)) });
+  const modelos = await listModelOptions(db, plan?.allowedTiers ?? []);
+  const modelId = projeto?.defaultModelId ?? defaultModelFor(modelos);
+  const [conversa] = await db
+    .insert(schema.conversations)
+    .values({ orgId: org.id, projectId: id, title: pedido.length > 60 ? `${pedido.slice(0, 57)}…` : pedido, modelId, createdBy: user.id })
+    .returning({ id: schema.conversations.id });
+  await db.insert(schema.messages).values({ conversationId: conversa!.id, role: "user", content: pedido });
+  redirect(`/projetos/${id}?c=${conversa!.id}&responder=1`);
 }
 
 /** Entrada na call: garante o projeto onde a conversa será registrada. */

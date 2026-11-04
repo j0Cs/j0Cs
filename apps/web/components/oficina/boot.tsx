@@ -14,16 +14,30 @@ export function Ignicao({ linhas }: { linhas: string[] }) {
     let jaViu = false;
     try {
       jaViu = sessionStorage.getItem("forja_ignicao") === "1";
-      sessionStorage.setItem("forja_ignicao", "1");
     } catch {
       // armazenamento bloqueado: segue sem a animação
       jaViu = true;
     }
     if (jaViu || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    setN(0);
     setVisivel(true);
     const timers = linhas.map((_, i) => setTimeout(() => setN(i + 1), 180 + i * 260));
-    timers.push(setTimeout(() => setVisivel(false), 420 + linhas.length * 260));
-    return () => timers.forEach(clearTimeout);
+    timers.push(
+      setTimeout(() => {
+        setVisivel(false);
+        // só marca como vista quando termina: no StrictMode o efeito roda duas vezes e a
+        // primeira execução é desfeita na hora (a sobreposição não pode ficar presa na tela)
+        try {
+          sessionStorage.setItem("forja_ignicao", "1");
+        } catch {
+          // sem armazenamento: tudo bem
+        }
+      }, 420 + linhas.length * 260),
+    );
+    return () => {
+      timers.forEach(clearTimeout);
+      setVisivel(false);
+    };
   }, [linhas]);
 
   if (!visivel) return null;

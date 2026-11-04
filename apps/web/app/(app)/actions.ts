@@ -1,6 +1,7 @@
 "use server";
 
 import { getWebAuth } from "@forja/auth";
+import { consumeRateLimit, getDb } from "@forja/db";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ACTIVE_ORG_COOKIE, getAuthUser, getSession } from "@/lib/session";
@@ -23,5 +24,7 @@ export async function switchOrg(formData: FormData) {
 export async function resendVerification() {
   const user = await getAuthUser();
   if (!user || user.emailVerified) return;
+  // chamada direta ao Better Auth não passa pelo limitador dele: limita aqui
+  if (!(await consumeRateLimit(getDb(), `email:verificacao:${user.id}`, 3, 900))) return;
   await getWebAuth().api.sendVerificationEmail({ body: { email: user.email, callbackURL: "/central" }, headers: await headers() });
 }

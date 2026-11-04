@@ -17,6 +17,11 @@ export async function POST(request: Request) {
   });
   if (!sessao) return Response.json({ erro: "Chamada não encontrada." }, { status: 404 });
   if (sessao.status !== "active") return Response.json({ encerrar: true, motivo: "Chamada já encerrada." });
+  if (org.status !== "active") {
+    await cobrarAte(db, sessao, new Date());
+    await encerrarSessao(db, sessao, "conta-suspensa");
+    return Response.json({ encerrar: true, motivo: "Sua conta está suspensa. Fale com o suporte." });
+  }
 
   const { cobrado, saldo } = await cobrarAte(db, sessao, new Date());
   const proximoMinuto = await precoMinutoBrlMicros(db);

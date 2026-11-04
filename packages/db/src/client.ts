@@ -20,6 +20,17 @@ export function sslConfig(env = process.env): pg.PoolConfig["ssl"] {
 }
 
 /**
+ * Com SSL configurado por variável, remove sslmode/sslrootcert/... da URL: no `pg`, os
+ * parâmetros da URL sobrescrevem o objeto `ssl` e o certificado da Supabase seria ignorado.
+ */
+export function semParametrosSsl(connectionString: string, env = process.env): string {
+  if (!sslConfig(env)) return connectionString;
+  const url = new URL(connectionString);
+  for (const p of ["sslmode", "ssl", "sslcert", "sslkey", "sslrootcert", "uselibpqcompat"]) url.searchParams.delete(p);
+  return url.toString();
+}
+
+/**
  * Conexão preguiçosa e única por processo (sobrevive ao hot reload do Next).
  * Na Vercel use a URL do pooler da Supabase em modo transação (porta 6543) e um pool pequeno.
  */
@@ -28,7 +39,7 @@ export function getDb(): Db {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) throw new Error("DATABASE_URL não definida (veja .env.example).");
     g.__forjaPool = new pg.Pool({
-      connectionString,
+      connectionString: semParametrosSsl(connectionString),
       max: Number(process.env.DATABASE_POOL_MAX ?? 10),
       idleTimeoutMillis: 5_000,
       connectionTimeoutMillis: 10_000,

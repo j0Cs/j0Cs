@@ -11,6 +11,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -24,7 +25,7 @@ export const modelTierEnum = pgEnum("model_tier", ["economico", "intermediario",
 export const orgStatusEnum = pgEnum("org_status", ["active", "suspended"]);
 export const memberRoleEnum = pgEnum("member_role", ["owner", "admin", "member"]);
 export const subscriptionStatusEnum = pgEnum("subscription_status", ["trialing", "active", "past_due", "canceled"]);
-export const usageStatusEnum = pgEnum("usage_status", ["ok", "refused", "error"]);
+export const usageStatusEnum = pgEnum("usage_status", ["ok", "refused", "error", "aborted"]);
 export const ledgerKindEnum = pgEnum("ledger_kind", ["plan_grant", "topup", "usage", "adjustment", "refund", "expiry"]);
 export const keyStatusEnum = pgEnum("key_status", ["active", "disabled"]);
 export const messageRoleEnum = pgEnum("message_role", ["user", "assistant"]);
@@ -368,12 +369,25 @@ export const voiceSessions = pgTable(
     providerKeyId: uuid("provider_key_id"),
     providerSessionId: text("provider_session_id").notNull(),
     model: text("model").notNull(),
-    status: text("status").notNull().default("active"),
+    /** connecting → active → closing (desligamento pendente no provedor) → closed */
+    status: text("status").notNull().default("connecting"),
     startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
     lastPulseAt: timestamp("last_pulse_at", { withTimezone: true }).notNull().defaultNow(),
     billedSeconds: integer("billed_seconds").notNull().default(0),
     endedAt: timestamp("ended_at", { withTimezone: true }),
     endReason: text("end_reason"),
   },
-  (t) => [index("voice_sessions_status_idx").on(t.status, t.lastPulseAt), index("voice_sessions_org_idx").on(t.orgId)],
+  (t) => [
+    index("voice_sessions_status_idx").on(t.status, t.lastPulseAt),
+    index("voice_sessions_org_idx").on(t.orgId),
+    // no máximo UMA call em nuvem por pessoa (connecting/active/closing)
+    uniqueIndex("voice_sessions_um_por_usuario").on(t.userId).where(sql`${t.status} <> 'closed'`),
+  ],
 );
+
+/** Limite de tentativas (login, e-mails, convites) — as chamadas diretas ao Better Auth não passam pelo limitador dele. */
+export const rateLimits = pgTable("rate_limits", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(0),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull().defaultNow(),
+});

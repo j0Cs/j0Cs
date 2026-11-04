@@ -21,8 +21,9 @@ que funciona em produção (staging).
 - [x] Confirmação de e-mail obrigatória para usar os modelos (anti-abuso do teste grátis)
 - [x] Painel do dono com login próprio, **2FA obrigatório**, só contas "staff" e allowlist de IP (saiu o HTTP Basic)
 - [x] E-mail transacional pelo **Microsoft 365** (Graph, caixa única) — falta a configuração no Microsoft 365 (prompt do Cowork pronto)
-- [x] Preparado para **Supabase + Vercel** (São Paulo, RLS, pool, migrações no build) — doc 6
-- [ ] Deploy de **staging**: Vercel (região GRU) + Postgres em São Paulo + variáveis no cofre
+- [x] Preparado para **Supabase + Vercel** (RLS, pool, migrações no build só em produção) — doc 6
+- [x] Banco criado na Supabase (`us-east-1`) com as migrações aplicadas; projetos `forja-web` e `forja-admin` criados na Vercel (`iad1`)
+- [ ] Segredos na Vercel (banco, `ENCRYPTION_KEY`, `BETTER_AUTH_SECRET`, `CRON_SECRET`, conta do dono) e primeiro deploy de produção
 - [ ] **Chaves reais dos 4 provedores** e smoke test com cada modelo (validar formatos de uso, principalmente xAI e Gemini)
 - [ ] Monitoramento de erros (Sentry) e logs estruturados do gateway
 - [ ] **Começar a gastar nas APIs agora**: os limites de taxa (tiers) de Anthropic e OpenAI sobem conforme o histórico

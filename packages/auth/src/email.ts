@@ -100,7 +100,18 @@ export function resetEmailTokenCache() {
 
 const APP = () => process.env.NEXT_PUBLIC_APP_NAME ?? "Forja";
 
+/** Escapa texto para HTML (nomes de pessoas e empresas vêm do usuário). */
+export function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+/**
+ * Layout padrão. `title`, `cta.label` e `cta.url` são escapados aqui; `body` é HTML confiável
+ * montado pelo chamador — qualquer valor vindo do usuário dentro dele deve passar por escapeHtml().
+ */
 export function emailLayout(title: string, body: string, cta?: { label: string; url: string }) {
+  title = escapeHtml(title);
+  if (cta) cta = { label: escapeHtml(cta.label), url: escapeHtml(cta.url) };
   return `<!doctype html><html><body style="font-family:system-ui,sans-serif;background:#fafafa;padding:24px">
 <div style="max-width:480px;margin:auto;background:#fff;border:1px solid #e4e4e7;border-radius:12px;padding:28px">
 <p style="font-weight:700;color:#ea580c;margin:0 0 16px">${APP()}</p>

@@ -1,4 +1,4 @@
-import { and, asc, eq, schema } from "@forja/db";
+import { and, asc, consumeRateLimit, eq, schema } from "@forja/db";
 import { EMPTY_SPEC, parseSpec, SPEC_SYSTEM_PROMPT, type CallSpec } from "@/lib/call";
 import { collectChat } from "@/lib/gateway";
 import { defaultModelFor, listModelOptions } from "@/lib/models";
@@ -11,8 +11,14 @@ export async function POST(request: Request) {
   const session = await getApiSession();
   if (!session) return Response.json({ error: "Não autenticado." }, { status: 401 });
   const { db, org, user, plan } = session;
-  const body = (await request.json()) as { conversationId?: string; spec?: CallSpec };
+  if (!user.emailVerified) return Response.json({ error: "Confirme seu e-mail." }, { status: 403 });
+  const bruto = await request.text();
+  if (bruto.length > 16_000) return Response.json({ error: "Especificação grande demais." }, { status: 413 });
+  const body = JSON.parse(bruto || "{}") as { conversationId?: string; spec?: unknown };
   if (!body.conversationId) return Response.json({ error: "conversationId obrigatório." }, { status: 400 });
+  if (!(await consumeRateLimit(db, `spec:${user.id}`, 30, 60))) {
+    return Response.json({ error: "Muitas atualizações seguidas." }, { status: 429 });
+  }
 
   const conversa = await db.query.conversations.findFirst({
     where: and(eq(schema.conversations.id, body.conversationId), eq(schema.conversations.orgId, org.id)),
@@ -26,10 +32,11 @@ export async function POST(request: Request) {
     .orderBy(asc(schema.messages.createdAt));
   const transcricao = msgs
     .slice(-40)
-    .map((m) => `${m.role === "user" ? "Cliente" : "Engenheiro"}: ${m.content}`)
+    .map((m) => `${m.role === "user" ? "Cliente" : "Engenheiro"}: ${m.content.slice(0, 2_000)}`)
     .join("\n");
 
-  const anterior = body.spec ?? EMPTY_SPEC;
+  // nunca confia no formato vindo do navegador: normaliza (listas e tamanhos limitados)
+  const anterior: CallSpec = body.spec ? parseSpec(JSON.stringify(body.spec), EMPTY_SPEC) : EMPTY_SPEC;
   const modelos = await listModelOptions(db, plan?.allowedTiers ?? []);
   const modelId = defaultModelFor(modelos, ["claude-haiku-5-5", "gpt-6-luna", "gemini-3.1-flash-lite", "claude-sonnet-5-5"]);
 

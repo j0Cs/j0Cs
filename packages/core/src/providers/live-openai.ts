@@ -50,13 +50,75 @@ export async function createLiveSession(input: LiveSessionInput): Promise<{ sess
   return { sessionId: body.session.id, sdpAnswer: body.transport.sdp };
 }
 
-/** Encerra a sessão no provedor (corte por saldo, abandono ou fim normal). Idempotente na prática. */
+/**
+ * Encerra a sessão pelo canal lateral (sideband), o caminho documentado para sessões WebRTC:
+ * conecta em `wss://…/live/sessions/{id}/attach` com a chave, envia `session.close` e espera
+ * o `session.closed` (que traz o motivo e o uso final em segundos). Resolve `ok: false` se
+ * não conseguir conectar ou se o `session.closed` não chegar a tempo.
+ */
+export async function closeLiveSession(input: {
+  apiKey: string;
+  sessionId: string;
+  timeoutMs?: number;
+  WebSocketImpl?: typeof WebSocket;
+}): Promise<{ ok: boolean; reason?: string; usageSeconds?: number }> {
+  const Ws = input.WebSocketImpl ?? globalThis.WebSocket;
+  if (!Ws) return { ok: false };
+  const url = `${base().replace(/^http/, "ws")}/${encodeURIComponent(input.sessionId)}/attach`;
+  return new Promise((resolve) => {
+    let fim = false;
+    let ws: WebSocket;
+    const terminar = (r: { ok: boolean; reason?: string; usageSeconds?: number }) => {
+      if (fim) return;
+      fim = true;
+      clearTimeout(timer);
+      try {
+        ws?.close();
+      } catch {
+        // já fechado
+      }
+      resolve(r);
+    };
+    const timer = setTimeout(() => terminar({ ok: false }), input.timeoutMs ?? 8_000);
+    try {
+      // `headers` é extensão do WebSocket do Node (undici); o do navegador não aceita
+      ws = new Ws(url, { headers: { authorization: `Bearer ${input.apiKey}` } } as unknown as string[]);
+    } catch {
+      terminar({ ok: false });
+      return;
+    }
+    ws.onopen = () => ws.send(JSON.stringify({ type: "session.close" }));
+    ws.onmessage = (m) => {
+      let e: { type?: string; reason?: string; usage?: { seconds?: number } };
+      try {
+        e = JSON.parse(String(m.data));
+      } catch {
+        return;
+      }
+      if (e.type === "session.closed") terminar({ ok: true, reason: e.reason, usageSeconds: e.usage?.seconds });
+    };
+    ws.onerror = () => terminar({ ok: false });
+    ws.onclose = () => terminar({ ok: false });
+  });
+}
+
+/**
+ * Plano B: endpoint REST de desligamento. A documentação o cita ("called the hangup
+ * endpoint") mas a referência lida não detalha o caminho para WebRTC. 404/409 = já encerrada.
+ */
 export async function hangupLiveSession(input: { apiKey: string; sessionId: string; fetchImpl?: typeof fetch }) {
   const f = input.fetchImpl ?? fetch;
   const res = await f(`${base()}/${encodeURIComponent(input.sessionId)}/hangup`, {
     method: "POST",
     headers: { authorization: `Bearer ${input.apiKey}` },
   });
-  // 404/409 = já encerrada: tudo bem
   return res.ok || res.status === 404 || res.status === 409;
+}
+
+/** Desliga a sessão: canal lateral primeiro, REST como reserva. true = confirmado. */
+export async function endLiveSession(input: { apiKey: string; sessionId: string; timeoutMs?: number; WebSocketImpl?: typeof WebSocket; fetchImpl?: typeof fetch }) {
+  const lateral = await closeLiveSession(input);
+  if (lateral.ok) return { ok: true as const, via: "sideband" as const, reason: lateral.reason, usageSeconds: lateral.usageSeconds };
+  const rest = await hangupLiveSession(input).catch(() => false);
+  return rest ? { ok: true as const, via: "hangup" as const } : { ok: false as const };
 }

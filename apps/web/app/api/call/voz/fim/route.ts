@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   // Conexão que não chegou a fechar (nenhum pulso, menos de 30 s): não cobra o cliente; a plataforma absorve.
   const naoConectou = falhou === true && sessao.billedSeconds === 0 && Date.now() - sessao.startedAt.getTime() < 30_000;
   const { cobrado } =
-    sessao.status === "active" && !naoConectou ? await cobrarAte(db, sessao, new Date()) : { cobrado: 0 };
+    (sessao.status === "active" || sessao.status === "closing") && !naoConectou ? await cobrarAte(db, sessao, new Date()) : { cobrado: 0 };
   await encerrarSessao(db, sessao, naoConectou ? "falha-conexao" : "fim");
   return Response.json({ ok: true, cobrado });
 }

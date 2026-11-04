@@ -1,4 +1,4 @@
-import "./env";
+import { somenteEmProducao } from "./env";
 import { DEFAULT_MODELS, DEFAULT_PLANS, DEFAULT_PRICING_SETTINGS, PROVIDERS, type ProviderId } from "@forja/core";
 import { encryptSecret, secretHint } from "@forja/core/server";
 import { hashPassword } from "better-auth/crypto";
@@ -20,11 +20,19 @@ import { addCredits } from "../store";
 
 /**
  * Seed idempotente: catálogo, planos, configurações e uma conta demo.
- * Rodar de novo atualiza planos; preços de modelos editados no painel são preservados.
+ * Roda a cada deploy do painel, então só CRIA o que falta: planos e modelos editados no
+ * painel são preservados. Para reaplicar os planos padrão do código: SEED_RESET_PLANS=1.
  */
+somenteEmProducao("seed");
+
 const db = getDb();
 
+const reaplicarPlanos = process.env.SEED_RESET_PLANS === "1";
 for (const p of DEFAULT_PLANS) {
+  if (!reaplicarPlanos) {
+    await db.insert(plans).values(p).onConflictDoNothing();
+    continue;
+  }
   await db
     .insert(plans)
     .values(p)
@@ -42,7 +50,7 @@ for (const p of DEFAULT_PLANS) {
       },
     });
 }
-console.log(`✔ ${DEFAULT_PLANS.length} planos`);
+console.log(`✔ ${DEFAULT_PLANS.length} planos ${reaplicarPlanos ? "reaplicados" : "garantidos (edições do painel preservadas)"}`);
 
 for (const m of DEFAULT_MODELS) {
   await db.insert(models).values(m).onConflictDoNothing();
@@ -110,8 +118,9 @@ if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
   console.log(`✔ conta do painel do dono: ${staff.email}`);
 }
 
-// Conta demo para desenvolvimento (nunca em produção)
-if (process.env.NODE_ENV === "production") {
+// Conta demo (senha pública no README): SÓ com opt-in explícito e NUNCA em build da Vercel.
+// Não dependa de NODE_ENV: no comando de build da Vercel ele pode não estar definido.
+if (process.env.SEED_DEMO !== "1" || process.env.VERCEL) {
   await closeDb();
   process.exit(0);
 }

@@ -14,25 +14,29 @@ export async function garantirProjeto(
   ctx: { orgId: string; userId: string; maxProjects: number | null | undefined },
   projetoId: string,
   nomeSugerido: string,
-): Promise<{ id: string } | { erro: string }> {
+): Promise<{ id: string; criado: boolean } | { erro: string }> {
   if (projetoId && projetoId !== "nova") {
     const existente = await db.query.projects.findFirst({
       where: and(eq(schema.projects.id, projetoId), eq(schema.projects.orgId, ctx.orgId), isNull(schema.projects.archivedAt)),
     });
-    if (existente) return { id: existente.id };
+    if (existente) return { id: existente.id, criado: false };
   }
-  if (ctx.maxProjects != null) {
-    const [row] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(schema.projects)
-      .where(and(eq(schema.projects.orgId, ctx.orgId), isNull(schema.projects.archivedAt)));
-    if ((row?.n ?? 0) >= ctx.maxProjects) {
-      return { erro: `Seu plano permite ${ctx.maxProjects} projetos ativos. Escolha um projeto existente ou arquive um.` };
+  // trava por organização: duas abas criando projeto ao mesmo tempo não furam o limite do plano
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ctx.orgId}))`);
+    if (ctx.maxProjects != null) {
+      const [row] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(schema.projects)
+        .where(and(eq(schema.projects.orgId, ctx.orgId), isNull(schema.projects.archivedAt)));
+      if ((row?.n ?? 0) >= ctx.maxProjects) {
+        return { erro: `Seu plano permite ${ctx.maxProjects} projetos ativos. Escolha um projeto existente ou arquive um.` };
+      }
     }
-  }
-  const [novo] = await db
-    .insert(schema.projects)
-    .values({ orgId: ctx.orgId, name: titulo(nomeSugerido), createdBy: ctx.userId })
-    .returning({ id: schema.projects.id });
-  return { id: novo!.id };
+    const [novo] = await tx
+      .insert(schema.projects)
+      .values({ orgId: ctx.orgId, name: titulo(nomeSugerido), createdBy: ctx.userId })
+      .returning({ id: schema.projects.id });
+    return { id: novo!.id, criado: true };
+  });
 }

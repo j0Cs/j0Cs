@@ -15,6 +15,18 @@ import { emailLayout, sendEmail } from "./email";
 
 const appName = () => process.env.NEXT_PUBLIC_APP_NAME ?? "Forja";
 
+/**
+ * URL pública do app: variável explícita (WEB_URL/ADMIN_URL) > domínio de produção que a
+ * Vercel injeta no projeto (o .vercel.app, ou o domínio próprio quando houver) > localhost.
+ */
+function publicUrl(explicit: string | undefined, devPort: number): string {
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  return vercel ? `https://${vercel}` : `http://localhost:${devPort}`;
+}
+export const webUrl = () => publicUrl(process.env.WEB_URL, 3000);
+export const adminUrl = () => publicUrl(process.env.ADMIN_URL, 3001);
+
 function baseOptions(baseURL: string, cookiePrefix: string) {
   const secret = process.env.BETTER_AUTH_SECRET;
   if (!secret && process.env.NODE_ENV === "production") {
@@ -77,7 +89,7 @@ function githubProvider() {
 export const isGithubLoginEnabled = () => Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
 
 function createWebAuth() {
-  const base = baseOptions(process.env.WEB_URL ?? "http://localhost:3000", "forja");
+  const base = baseOptions(webUrl(), "forja");
   return betterAuth({
     ...base,
     socialProviders: githubProvider(),
@@ -111,7 +123,7 @@ function createWebAuth() {
 }
 
 function createAdminAuth() {
-  const base = baseOptions(process.env.ADMIN_URL ?? "http://localhost:3001", "forja-admin");
+  const base = baseOptions(adminUrl(), "forja-admin");
   return betterAuth({
     ...base,
     emailAndPassword: { ...base.emailAndPassword, disableSignUp: true },
@@ -135,5 +147,5 @@ export function getAdminAuth(): AdminAuth {
 }
 
 export { hashPassword } from "better-auth/crypto";
-export { sendEmail, emailLayout } from "./email";
+export { sendEmail, emailLayout, escapeHtml } from "./email";
 export { authErrorMessage } from "./errors";
