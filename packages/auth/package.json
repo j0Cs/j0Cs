@@ -1,0 +1,25 @@
+{
+  "name": "@forja/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./email": "./src/email.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@forja/core": "workspace:*",
+    "@forja/db": "workspace:*",
+    "better-auth": "^1.7.16",
+    "drizzle-orm": "^0.45.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "typescript": "5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

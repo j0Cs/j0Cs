@@ -15,8 +15,12 @@ que funciona em produção (staging).
 
 ## Sprint 1: Contas reais e staging (05/11 → 15/11)
 
-- [ ] Login com **Better Auth**: e-mail e senha, magic link, GitHub OAuth, organizações, convites e papéis (dono/admin/membro)
-- [ ] Painel do dono com login próprio, **2FA obrigatório** e allowlist de IP (sai o HTTP Basic)
+- [x] Login com **Better Auth**: e-mail e senha, link mágico, GitHub OAuth (falta criar o OAuth App), recuperação de senha
+- [x] Organizações: cadastro já cria a empresa no **teste grátis** (7 dias, R$ 10, só modelos econômicos), troca entre
+  organizações, convites por e-mail com limite de assentos, papéis dono/admin/membro
+- [x] Confirmação de e-mail obrigatória para usar os modelos (anti-abuso do teste grátis)
+- [x] Painel do dono com login próprio, **2FA obrigatório**, só contas "staff" e allowlist de IP (saiu o HTTP Basic)
+- [ ] E-mail transacional em produção: conta no Resend + domínio verificado (SPF/DKIM)
 - [ ] Deploy de **staging**: Vercel (região GRU) + Postgres em São Paulo + variáveis no cofre
 - [ ] **Chaves reais dos 4 provedores** e smoke test com cada modelo (validar formatos de uso, principalmente xAI e Gemini)
 - [ ] Monitoramento de erros (Sentry) e logs estruturados do gateway

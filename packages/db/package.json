@@ -8,7 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "echo \"(db) sem testes unitários — coberto pelo smoke test\"",
+    "test": "echo \"(db) sem testes unit\u00e1rios \u2014 coberto pelo smoke test\"",
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/scripts/migrate.ts",
     "seed": "tsx src/scripts/seed.ts"
@@ -16,7 +16,8 @@
   "dependencies": {
     "@forja/core": "workspace:*",
     "drizzle-orm": "^0.45.4",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "better-auth": "^1.7.16"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",

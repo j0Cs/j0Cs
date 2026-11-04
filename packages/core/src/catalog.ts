@@ -251,7 +251,21 @@ export const TIER_LABELS: Record<ModelTier, string> = {
 };
 
 /** Planos sugeridos (ver docs/03-precificacao-e-unit-economics.md). */
+export const TRIAL_PLAN_ID = "trial";
+export const TRIAL_DAYS = 7;
+
 export const DEFAULT_PLANS: PlanDefinition[] = [
+  {
+    id: TRIAL_PLAN_ID,
+    name: "Teste grátis",
+    priceBrlCents: 0,
+    includedCreditsBrlCents: 10_00,
+    seats: 1,
+    maxProjects: 2,
+    allowedTiers: ["economico"],
+    description: "7 dias com R$ 10 em créditos e modelos econômicos. Modelos premium liberam após o pagamento.",
+    sortOrder: 0,
+  },
   {
     id: "starter",
     name: "Starter",

@@ -25,8 +25,9 @@ apps/
   web/        Next.js 16: área do cliente
   admin/      Next.js 16: painel do dono (deploy separado, acesso restrito)
 packages/
+  auth/       Login (Better Auth): cliente com e-mail/senha, link mágico e GitHub; dono com 2FA
   core/       Gateway de IA, adaptadores dos provedores, precificação, criptografia (testado)
-  db/         Schema Postgres (Drizzle), migrações, seed, consultas dos painéis
+  db/         Schema Postgres (Drizzle), migrações, seed, organizações e convites, consultas dos painéis
   ui/         Componentes visuais compartilhados (Tailwind v4)
 docs/         Plano do produto
 ```
@@ -47,8 +48,9 @@ cp .env.example .env
 pnpm gen:key
 ```
 
-Cole a chave gerada em `ENCRYPTION_KEY` no `.env` e defina `ADMIN_PASSWORD`. Para testar respostas reais, coloque ao
-menos uma chave de provedor (ex.: `ANTHROPIC_API_KEY`) **antes** do seed: ela vai criptografada para o pool de chaves.
+Rode duas vezes e cole uma chave em `ENCRYPTION_KEY` e a outra em `BETTER_AUTH_SECRET`. Defina `ADMIN_EMAIL` e
+`ADMIN_PASSWORD` (sua conta do painel do dono). Para testar respostas reais, coloque ao menos uma chave de provedor
+(ex.: `ANTHROPIC_API_KEY`) **antes** do seed: ela vai criptografada para o pool de chaves.
 
 ```bash
 pnpm db:up && pnpm db:migrate && pnpm db:seed
@@ -58,8 +60,11 @@ pnpm db:up && pnpm db:migrate && pnpm db:seed
 pnpm dev
 ```
 
-- Cliente: http://localhost:3000 (entra direto na conta demo `demo@forja.dev`, plano Pro, R$ 300 de créditos)
-- Dono: http://localhost:3001 (usuário/senha do `.env`)
+- Cliente: http://localhost:3000. Entre com `demo@forja.dev` / `demo12345` (plano Pro, R$ 300 de créditos, 3 assentos)
+  ou crie uma conta nova em `/cadastro` (teste grátis de 7 dias com R$ 10).
+- Dono: http://localhost:3001 com `ADMIN_EMAIL` / `ADMIN_PASSWORD`. No primeiro acesso o painel pede para ativar o
+  2FA com um app autenticador (Google Authenticator, 1Password, Authy…).
+- Sem `RESEND_API_KEY`, os e-mails (confirmação, convite, link mágico, senha) aparecem no terminal do `pnpm dev`.
 
 ## Verificações
 
@@ -75,11 +80,14 @@ pnpm test
 pnpm build
 ```
 
-## Estado atual (Sprint 0, fundação)
+## Estado atual (Sprints 0 e 1)
 
 Pronto e testado: gateway multi-provedor com streaming, cache de prompt e fallback automático; medição de tokens,
 custo em US$ e cobrança em R$; extrato de créditos imutável; bloqueio por plano e por saldo; pool de chaves
 criptografadas com failover; painéis do cliente e do dono; conectores com verificação da credencial.
+**Contas reais**: cadastro com teste grátis, confirmação de e-mail, link mágico, recuperação de senha, login com GitHub
+(quando configurado), organizações, convites com limite de assentos e papéis; painel do dono só para a equipe, com
+2FA obrigatório e lista opcional de IPs.
 
-Provisório: o login usa a conta demo (`apps/web/lib/session.ts`) e o painel do dono usa HTTP Basic (`apps/admin/proxy.ts`).
-O login de verdade entra na Sprint 1. O resto está no [roadmap](docs/04-roadmap-lancamento.md).
+Falta da Sprint 1 (depende das suas contas): deploy de staging, chaves reais dos 4 provedores e monitoramento de erros.
+O resto está no [roadmap](docs/04-roadmap-lancamento.md).

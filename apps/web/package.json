@@ -8,12 +8,14 @@
     "build": "next build",
     "start": "next start --port 3000",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "echo \"(web) sem testes unitários\""
+    "test": "echo \"(web) sem testes unit\u00e1rios\""
   },
   "dependencies": {
+    "@forja/auth": "workspace:*",
     "@forja/core": "workspace:*",
     "@forja/db": "workspace:*",
     "@forja/ui": "workspace:*",
+    "better-auth": "^1.7.16",
     "lucide-react": "^1.68.0",
     "next": "^16.4.5",
     "pg": "^8.23.1",

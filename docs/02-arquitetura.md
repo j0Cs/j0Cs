@@ -90,7 +90,7 @@ Regras que estão no código e cobertas por testes (`packages/core/test`):
 | Cobrança | **Créditos pré-pagos em R$** + assinatura | Elimina o risco de um cliente pesado dar prejuízo; o cliente controla o gasto | "Ilimitado" com limite escondido (ver doc 3) |
 | Banco | Postgres gerenciado na **região São Paulo** (Supabase ou Neon) | Latência e LGPD; o Supabase também é conector do cliente | MySQL/PlanetScale |
 | Hospedagem | Vercel para os dois apps | Deploy por PR, streaming, região GRU | Railway/Fly (mais trabalho de operação) |
-| Login | **Better Auth** (Sprint 1): e-mail, GitHub OAuth, organizações, 2FA | Usuários ficam no seu banco, sem lock-in nem custo por usuário | Supabase Auth, Clerk (pago por usuário ativo) |
+| Login | **Better Auth** (`packages/auth`): e-mail e senha, link mágico, GitHub OAuth, 2FA no painel. Organizações e convites são nossos (`packages/db/src/orgs.ts`) | Usuários ficam no seu banco, sem lock-in nem custo por usuário | Supabase Auth, Clerk (pago por usuário ativo) |
 | Pagamentos | **Asaas** no lançamento (Pix Automático, boleto, cartão recorrente, emissão de NFS-e); Stripe quando vender para fora | Cliente brasileiro paga com Pix e boleto e exige nota fiscal | Stripe só (tem Pix, mas a NFS-e fica por sua conta), Pagar.me, Iugu |
 | Tarefas longas de agente | Fila de jobs (Inngest ou Trigger.dev) + sandbox (E2B, Vercel Sandbox ou Daytona), na fase 2 | Funções serverless têm tempo máximo; agente que roda testes precisa de contêiner | Servidor próprio com Docker |
 
@@ -100,13 +100,17 @@ Regras que estão no código e cobertas por testes (`packages/core/test`):
    e os 4 últimos caracteres. A chave mestra (`ENCRYPTION_KEY`) fica no cofre de variáveis da hospedagem; o prefixo `v1.`
    permite migrar para KMS (AWS/GCP) sem reescrever dados.
 2. **Chaves testadas antes de salvar** (listagem de modelos, que é gratuita) e nunca devolvidas para a tela.
-3. **Painel do dono isolado**: deploy e domínio separados, falha fechada sem senha configurada, 2FA e allowlist de IP na Sprint 1.
-4. **Isolamento entre clientes**: toda consulta filtra por `org_id` da sessão; IDs de projeto ou conversa de outra organização dão 404.
-5. **Conectores**: tokens com o menor escopo possível (fine-grained no GitHub, usuário só-leitura no Postgres). Em
+3. **Painel do dono isolado**: deploy, domínio e cookie separados; cadastro desativado (só contas "staff" criadas pelo
+   seed); **2FA obrigatório** antes de qualquer tela; allowlist de IP opcional; toda página e server action chama
+   `requireStaff()` (o proxy só faz a checagem otimista do cookie).
+4. **Contas de cliente**: Better Auth com sessões no Postgres (14 dias), limite de tentativas, senha com hash forte,
+   confirmação de e-mail obrigatória para usar modelos, links de convite com token aleatório de 192 bits e validade de 7 dias.
+5. **Isolamento entre clientes**: toda consulta filtra por `org_id` da sessão; IDs de projeto ou conversa de outra organização dão 404.
+6. **Conectores**: tokens com o menor escopo possível (fine-grained no GitHub, usuário só-leitura no Postgres). Em
    produção, connection strings para IPs internos são bloqueadas (proteção contra SSRF).
-6. **Abuso**: trial só libera modelos econômicos; modelos premium exigem pagamento confirmado. Limite de concorrência
+7. **Abuso**: trial só libera modelos econômicos e exige e-mail confirmado; modelos premium exigem pagamento confirmado. Limite de concorrência
    por organização na Sprint 3 (hoje o saldo pode ficar levemente negativo com chamadas simultâneas).
-7. **Prompt injection via repositório**: o agente v1 só propõe mudanças por PR (um humano aprova); nada é executado
+8. **Prompt injection via repositório**: o agente v1 só propõe mudanças por PR (um humano aprova); nada é executado
    automaticamente em produção.
 
 ## Termos dos provedores e LGPD (resumo, validar com advogado)

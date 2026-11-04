@@ -1,10 +1,12 @@
 import "./env";
 import { DEFAULT_MODELS, DEFAULT_PLANS, DEFAULT_PRICING_SETTINGS, PROVIDERS, type ProviderId } from "@forja/core";
 import { encryptSecret, secretHint } from "@forja/core/server";
+import { hashPassword } from "better-auth/crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { closeDb, getDb } from "../client";
 import { getPricingSettings, savePricingSettings } from "../mappers";
 import {
+  accounts,
   memberships,
   models,
   organizations,
@@ -71,12 +73,50 @@ if (process.env.ENCRYPTION_KEY) {
   }
 }
 
-// Conta demo para desenvolvimento
-const email = process.env.DEV_USER_EMAIL ?? "demo@forja.dev";
-let user = await db.query.users.findFirst({ where: eq(users.email, email) });
-if (!user) {
-  [user] = await db.insert(users).values({ email, name: "Usuário Demo" }).returning();
+/** Cria (ou reaproveita) um usuário com login por e-mail e senha. */
+async function ensureUser(input: { email: string; name: string; password: string; platformRole?: string }) {
+  let u = await db.query.users.findFirst({ where: eq(users.email, input.email) });
+  if (!u) {
+    [u] = await db
+      .insert(users)
+      .values({ email: input.email, name: input.name, emailVerified: true, platformRole: input.platformRole ?? "customer" })
+      .returning();
+  } else if (!u.emailVerified) {
+    // contas criadas pelo seed são confiáveis: e-mail já confirmado
+    await db.update(users).set({ emailVerified: true }).where(eq(users.id, u.id));
+  }
+  const credential = await db.query.accounts.findFirst({
+    where: and(eq(accounts.userId, u!.id), eq(accounts.providerId, "credential")),
+  });
+  if (!credential) {
+    await db.insert(accounts).values({
+      userId: u!.id,
+      providerId: "credential",
+      accountId: u!.id,
+      password: await hashPassword(input.password),
+    });
+  }
+  return u!;
 }
+
+// Equipe do dono (painel admin). Na primeira entrada o painel exige configurar o 2FA.
+if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
+  const staff = await ensureUser({
+    email: process.env.ADMIN_EMAIL.toLowerCase(),
+    name: "Administrador",
+    password: process.env.ADMIN_PASSWORD,
+    platformRole: "staff",
+  });
+  console.log(`✔ conta do painel do dono: ${staff.email}`);
+}
+
+// Conta demo para desenvolvimento (nunca em produção)
+if (process.env.NODE_ENV === "production") {
+  await closeDb();
+  process.exit(0);
+}
+const email = process.env.DEV_USER_EMAIL ?? "demo@forja.dev";
+const user = await ensureUser({ email, name: "Usuário Demo", password: process.env.DEV_USER_PASSWORD ?? "demo12345" });
 let org = await db.query.organizations.findFirst({ where: eq(organizations.slug, "demo") });
 if (!org) {
   [org] = await db.insert(organizations).values({ name: "Empresa Demo", slug: "demo", planId: "pro" }).returning();
@@ -88,6 +128,7 @@ if (!org) {
     orgId: org!.id,
     planId: "pro",
     status: "active",
+    seats: 3, // demo com 3 assentos para testar convites de equipe
     currentPeriodStart: now,
     currentPeriodEnd: end,
   });
@@ -106,7 +147,7 @@ if (!org) {
     instructions: "Responda em português do Brasil. Ao escrever código, use TypeScript.",
     createdBy: user!.id,
   });
-  console.log("✔ conta demo (demo@forja.dev / organização 'demo', plano Pro)");
+  console.log(`✔ conta demo: ${email} / senha ${process.env.DEV_USER_PASSWORD ?? "demo12345"} (plano Pro)`);
 }
 
 await closeDb();

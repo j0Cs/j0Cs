@@ -1,7 +1,7 @@
 import type { ChatMessage } from "@forja/core";
 import { authorize, GatewayError, runChat, type Effort } from "@forja/core/server";
 import { and, asc, createGatewayStore, eq, schema } from "@forja/db";
-import { getSession } from "@/lib/session";
+import { getApiSession } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -15,7 +15,12 @@ const HISTORY_LIMIT = 40;
 const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh"];
 
 export async function POST(request: Request) {
-  const { db, org, user } = await getSession();
+  const session = await getApiSession();
+  if (!session) return new Response("Não autenticado.", { status: 401 });
+  const { db, org, user } = session;
+  if (!user.emailVerified) {
+    return new Response("Confirme seu e-mail para usar os modelos de IA (veja o aviso no topo da página).", { status: 403 });
+  }
   const body = (await request.json()) as {
     projectId?: string;
     conversationId?: string | null;

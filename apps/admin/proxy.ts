@@ -1,38 +1,30 @@
+import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Proteção do painel do dono.
- *
- * ⚠️ PROVISÓRIO: HTTP Basic com ADMIN_USER/ADMIN_PASSWORD. Na Sprint 1 vira login
- * com 2FA obrigatório + allowlist de IP + usuários "staff" no banco.
- * Falha fechada: sem senha configurada, ninguém entra.
+ * Painel do dono:
+ * 1. Allowlist de IP (ADMIN_IP_ALLOWLIST="1.2.3.4,5.6.7.8"); vazio = sem restrição de IP.
+ * 2. Sem cookie de sessão → /entrar. A validação completa (staff + 2FA) fica em lib/admin.ts.
  */
-export function proxy(request: NextRequest) {
-  const user = process.env.ADMIN_USER;
-  const password = process.env.ADMIN_PASSWORD;
-  if (!user || !password) {
-    return new NextResponse("Painel bloqueado: defina ADMIN_USER e ADMIN_PASSWORD.", { status: 503 });
-  }
+const PUBLIC = ["/entrar", "/api/auth"];
 
-  const header = request.headers.get("authorization") ?? "";
-  const [scheme, encoded] = header.split(" ");
-  if (scheme === "Basic" && encoded) {
-    const decoded = atob(encoded);
-    const sep = decoded.indexOf(":");
-    if (safeEqual(decoded.slice(0, sep), user) && safeEqual(decoded.slice(sep + 1), password)) {
-      return NextResponse.next();
-    }
-  }
-  return new NextResponse("Autenticação necessária.", {
-    status: 401,
-    headers: { "www-authenticate": 'Basic realm="admin", charset="UTF-8"' },
-  });
+function clientIp(request: NextRequest) {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "";
 }
 
-function safeEqual(a: string, b: string) {
-  let diff = a.length ^ b.length;
-  for (let i = 0; i < Math.max(a.length, b.length); i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
-  return diff === 0;
+export function proxy(request: NextRequest) {
+  const allow = (process.env.ADMIN_IP_ALLOWLIST ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (allow.length && !allow.includes(clientIp(request))) {
+    return new NextResponse("Acesso não permitido a partir deste endereço.", { status: 403 });
+  }
+
+  const { pathname } = request.nextUrl;
+  if (PUBLIC.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return NextResponse.next();
+  if (getSessionCookie(request, { cookiePrefix: "forja-admin" })) return NextResponse.next();
+  return NextResponse.redirect(new URL("/entrar", request.url));
 }
 
 export const config = {

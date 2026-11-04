@@ -11,17 +11,21 @@
     "test": "echo \"(web) sem testes unit\u00e1rios\""
   },
   "dependencies": {
+    "@forja/auth": "workspace:*",
     "@forja/core": "workspace:*",
     "@forja/db": "workspace:*",
     "@forja/ui": "workspace:*",
+    "better-auth": "^1.7.16",
     "lucide-react": "^1.68.0",
     "next": "^16.4.5",
+    "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.4",
     "@types/node": "^22.19.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.2.0",
     "tailwindcss": "^4.3.4",
