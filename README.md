@@ -64,7 +64,7 @@ pnpm dev
   ou crie uma conta nova em `/cadastro` (teste grátis de 7 dias com R$ 10).
 - Dono: http://localhost:3001 com `ADMIN_EMAIL` / `ADMIN_PASSWORD`. No primeiro acesso o painel pede para ativar o
   2FA com um app autenticador (Google Authenticator, 1Password, Authy…).
-- Sem `RESEND_API_KEY`, os e-mails (confirmação, convite, link mágico, senha) aparecem no terminal do `pnpm dev`.
+- Sem as variáveis `MS_*` do Microsoft 365, os e-mails (confirmação, convite, link mágico, senha) aparecem no terminal do `pnpm dev`.
 
 ## Verificações
 

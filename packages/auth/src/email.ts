@@ -1,7 +1,11 @@
 /**
- * Envio de e-mail transacional (Resend). Sem RESEND_API_KEY, em desenvolvimento,
- * o e-mail é impresso no console do servidor (com o link clicável).
- * Em produção sem chave, o envio falha de forma visível no log, sem expor o link.
+ * Envio de e-mail transacional pelo Microsoft 365 (Microsoft Graph, permissão de
+ * aplicativo Mail.Send restrita a UMA caixa — ver docs/05-microsoft-365-email.md).
+ *
+ * Sem MS_TENANT_ID/MS_CLIENT_ID/MS_CLIENT_SECRET:
+ * - desenvolvimento: o e-mail é impresso no console do servidor (com o link);
+ * - produção: falha visível no log, SEM expor o link (quem lê log entraria na conta).
+ *   EMAIL_TO_CONSOLE=1 libera o console só para testes locais com `next start`.
  */
 export interface EmailMessage {
   to: string;
@@ -11,29 +15,78 @@ export interface EmailMessage {
   link?: string;
 }
 
-export async function sendEmail(msg: EmailMessage): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    // Em produção NUNCA imprime o link (quem lê os logs entraria na conta).
-    // EMAIL_TO_CONSOLE=1 libera o console só para testes locais com `next start`.
+interface GraphConfig {
+  tenantId: string;
+  clientId: string;
+  clientSecret: string;
+  from: string;
+}
+
+function graphConfig(): GraphConfig | null {
+  const { MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, EMAIL_FROM } = process.env;
+  if (!MS_TENANT_ID || !MS_CLIENT_ID || !MS_CLIENT_SECRET) return null;
+  if (!EMAIL_FROM) throw new Error("EMAIL_FROM (caixa remetente do Microsoft 365) não definido.");
+  return { tenantId: MS_TENANT_ID, clientId: MS_CLIENT_ID, clientSecret: MS_CLIENT_SECRET, from: EMAIL_FROM };
+}
+
+let cachedToken: { value: string; expiresAt: number; key: string } | null = null;
+
+/** Token de aplicativo (client credentials), reaproveitado até 1 min antes de expirar. */
+async function graphToken(cfg: GraphConfig, fetchImpl: typeof fetch): Promise<string> {
+  const key = `${cfg.tenantId}:${cfg.clientId}`;
+  if (cachedToken && cachedToken.key === key && cachedToken.expiresAt - 60_000 > Date.now()) return cachedToken.value;
+  const res = await fetchImpl(`https://login.microsoftonline.com/${encodeURIComponent(cfg.tenantId)}/oauth2/v2.0/token`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: cfg.clientId,
+      client_secret: cfg.clientSecret,
+      scope: "https://graph.microsoft.com/.default",
+      grant_type: "client_credentials",
+    }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error_description?: string };
+  if (!res.ok || !body.access_token) {
+    throw new Error(`Microsoft 365 recusou a autenticação (${res.status}): ${body.error_description?.split("\n")[0] ?? "sem detalhes"}`);
+  }
+  cachedToken = { value: body.access_token, expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000, key };
+  return body.access_token;
+}
+
+export async function sendEmail(msg: EmailMessage, fetchImpl: typeof fetch = fetch): Promise<void> {
+  const cfg = graphConfig();
+  if (!cfg) {
     if (process.env.NODE_ENV === "production" && process.env.EMAIL_TO_CONSOLE !== "1") {
-      console.error(JSON.stringify({ level: "error", msg: "RESEND_API_KEY ausente: e-mail não enviado", to: msg.to, subject: msg.subject }));
+      console.error(JSON.stringify({ level: "error", msg: "Microsoft 365 não configurado: e-mail não enviado", to: msg.to, subject: msg.subject }));
       return;
     }
     console.log(`\n✉️  [e-mail de desenvolvimento] para ${msg.to}: ${msg.subject}\n   ${msg.link ?? ""}\n`);
     return;
   }
-  const res = await fetch("https://api.resend.com/emails", {
+
+  const token = await graphToken(cfg, fetchImpl);
+  const res = await fetchImpl(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(cfg.from)}/sendMail`, {
     method: "POST",
-    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify({
-      from: process.env.EMAIL_FROM ?? "Forja <nao-responda@forja.dev>",
-      to: msg.to,
-      subject: msg.subject,
-      html: msg.html,
+      message: {
+        subject: msg.subject,
+        body: { contentType: "HTML", content: msg.html },
+        toRecipients: [{ emailAddress: { address: msg.to } }],
+      },
+      saveToSentItems: false,
     }),
   });
-  if (!res.ok) throw new Error(`Falha ao enviar e-mail (${res.status}): ${await res.text()}`);
+  // Sucesso = 202 Accepted (o Exchange entrega de forma assíncrona).
+  if (res.status !== 202) {
+    if (res.status === 401) cachedToken = null;
+    throw new Error(`Falha ao enviar e-mail pelo Microsoft 365 (${res.status}): ${(await res.text()).slice(0, 300)}`);
+  }
+}
+
+/** Só para testes. */
+export function resetEmailTokenCache() {
+  cachedToken = null;
 }
 
 const APP = () => process.env.NEXT_PUBLIC_APP_NAME ?? "Forja";
