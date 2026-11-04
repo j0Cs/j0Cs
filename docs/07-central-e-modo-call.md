@@ -41,13 +41,14 @@ navegador ──SDP──► /api/call/voz/sessao ──(nossa chave)──► O
     └─ fim: /api/call/voz/fim            → cobra até agora e desliga
 
 Desligar = servidor conecta no canal lateral wss://…/live/sessions/{id}/attach, envia session.close e espera
-session.closed (com os segundos que a OpenAI cobrou, registrados no log para conciliação); se falhar, tenta o
-endpoint REST de hangup.
+session.closed (com os segundos que a OpenAI cobrou); se não vier, tenta o endpoint REST de hangup. Um 404
+do REST só conta como "já encerrada" se o canal lateral nem chegou a abrir e a chave ainda é aceita pela
+OpenAI; se o canal abriu e não fechou, a sessão estava viva e a varredura tenta de novo.
 
-Vercel Cron (1/min): /api/cron/voz
-    ├─ "active" sem pulso há 30 s     → cobra até agora e desliga
-    ├─ "closing" (desligar falhou)    → tenta de novo; não cobra mais nada do cliente
-    └─ "connecting" parada há 2 min   → reserva órfã, libera
+Vercel Cron (1/min, até 4 min por execução): /api/cron/voz
+    ├─ "active" sem pulso há 30 s     → cobra até o último pulso + 90 s, no máximo, e desliga
+    ├─ "connecting" parada há 2 min   → reserva órfã, libera
+    └─ "closing" (desligar falhou)    → tenta de novo; não cobra mais nada do cliente
 ```
 
 - A chave da OpenAI **nunca** vai ao navegador: quem cria a sessão é o servidor.
@@ -56,11 +57,18 @@ Vercel Cron (1/min): /api/cron/voz
   entre o pulso e a varredura.
 - **Uma call aberta por pessoa** (índice único no banco) e saldo para 2 minutos de voz para abrir.
 - Quando pedimos o fim, a cobrança do cliente para ali (`ended_at`). Se o desligamento no provedor falhar, o tempo
-  extra é custo da plataforma. Depois de 10 minutos tentando, ou se a chave que abriu a call foi apagada, a call é
-  fechada mesmo assim com alerta `critical` no log, para não prender o usuário. Por isso o painel não deixa apagar
-  uma chave com call em andamento: desative e apague depois.
-- Sair da sala durante "Conectando…" cancela a conexão e fecha a sessão sem cobrar; quedas curtas de rede (até 10 s)
-  não derrubam a call.
+  extra é custo da plataforma. A call é fechada mesmo assim, com alerta `critical` no log, para não prender o
+  usuário, quando: passaram 10 minutos tentando, a chave que abriu a call foi apagada, ou a OpenAI recusou a chave.
+  Por isso o painel não deixa apagar uma chave com call em andamento: desative e apague depois.
+- **Conexão**: o navegador gera o id da reserva e manda junto no pedido. Sair da sala ou fechar a aba durante
+  "Conectando…" fecha a sessão sem cobrar, mesmo antes de o servidor responder. A call só começa a ser cobrada quando
+  o WebRTC chega a "connected" (até 15 s; redes que bloqueiam UDP caem em erro, sem cobrança). Quedas curtas de rede
+  (até 10 s) não derrubam a call.
+- **Isenção por falha de conexão**: o aviso vem do navegador, então vale no máximo 3 vezes por hora por pessoa; depois
+  disso a call é cobrada normalmente. Abrir call também tem limite (20 por hora por pessoa).
+- **Interrupções**: falar por cima do Hefesto (ou parar uma resposta no chat) não cancela o modelo. A resposta termina
+  no servidor, fica salva na conversa e é cobrada pelo uso real do provedor. Cancelar no meio exigiria estimar tokens
+  de raciocínio e de cache, que não aparecem no texto, e cobraria abaixo do custo.
 - `CRON_SECRET` precisa estar definido no projeto `forja-web` da Vercel (a Vercel o envia na varredura). O cron só roda
   em deploys de **produção**; em prévias de PR, a proteção fica por conta do pulso e do desligamento por queda de conexão.
 
@@ -71,4 +79,5 @@ varredura e o cancelamento no meio da conexão foram testados com um servidor qu
 encerramento) seguem a documentação de 04/11/2026 e estão concentrados em `components/oficina/voz-nuvem.ts`
 (`EVENTOS`). No primeiro teste com a chave real, confira: delegação → resposta falada, legendas em pt-BR e
 qualidade da voz `bossa` com nomes e números, e se o `session.close` pelo canal lateral derruba a call do
-navegador na hora (o log "call desligada" mostra `via: sideband` ou `via: hangup`).
+navegador na hora. Todo desligamento vai para o log: "call desligada" (`via: sideband`, com os segundos do provedor,
+ou `via: hangup`), "call dada como desligada sem confirmação" (aviso) ou "desligamento não confirmado" (erro).

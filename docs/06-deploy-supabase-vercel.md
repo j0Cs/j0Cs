@@ -58,7 +58,10 @@ Navegador (Brasil) ──► Vercel iad1 (Virgínia) ──► Supabase us-east-
    - **Data API** → desligue *Enable Data API*. Isso também resolve o alerta do Advisor sobre a função
      `public.rls_auto_enable()`, que a própria Supabase cria e deixa executável pelos papéis da Data API.
    - **Database Settings → SSL** → ligue *Enforce SSL* e baixe o certificado.
-2. Em **Connect**, copie (com a senha do banco que você definiu ao criar o projeto):
+2. Em **Connect**, copie (com a senha do banco que você definiu ao criar o projeto). Se a senha tiver caracteres
+   especiais, escreva-os codificados na URL (`/` → `%2F`, `?` → `%3F`, `#` → `%23`, `@` → `%40`, `%` → `%25`,
+   `:` → `%3A`) ou troque por uma senha só com letras e números. Uma URL inválida faz o build parar com uma
+   mensagem que **não** mostra a senha.
    - *Transaction pooler* (porta **6543**) → `DATABASE_URL`
    - *Session pooler* (porta **5432**) → `DATABASE_URL_DIRECT`. A migração **se recusa** a rodar na 6543: a trava
      que impede os dois builds de migrarem juntos não funciona no modo transação.
@@ -80,7 +83,7 @@ openssl rand -base64 32
 | `ADMIN_IP_ALLOWLIST` | | opcional | IPs liberados no painel, separados por vírgula |
 | `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `EMAIL_FROM` | ✔ | ✔ | doc 5 / `cowork/02-microsoft-365-email.md` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | ✔ | | `cowork/01-github-login.md` |
-| `WEB_URL` / `ADMIN_URL` | opcional | opcional | sem elas, cada app usa o próprio domínio de produção da Vercel (`VERCEL_PROJECT_PRODUCTION_URL`), que passa a ser o domínio próprio quando você ligar um |
+| `WEB_URL` / `ADMIN_URL` | opcional | opcional | sem elas, cada app usa o próprio domínio de produção da Vercel (`VERCEL_PROJECT_PRODUCTION_URL`), que passa a ser o domínio próprio quando você ligar um. Se um app tiver **mais de um** domínio próprio, defina a variável com o endereço canônico (o mesmo do callback do GitHub): a Vercel escolhe o domínio mais curto |
 | `ANTHROPIC_API_KEY` etc. | | | **não**: as chaves dos provedores são cadastradas no painel e ficam cifradas no banco |
 
    Marque só **Production** nos segredos do banco. Builds de *preview* (cada push numa branch) **não** migram nem
@@ -90,8 +93,9 @@ openssl rand -base64 32
    mergeado (ou num *Redeploy* manual depois disso). Cada build de produção roda as migrações pendentes (com trava no
    banco, então os dois apps podem buildar juntos). O build do painel também roda o seed:
    - planos e modelos só são **criados** se ainda não existirem. Edições feitas no painel não voltam ao padrão a cada
-     deploy. Para reaplicar os planos do código uma vez, rode com `SEED_RESET_PLANS=1`;
-   - cria a conta do dono a partir de `ADMIN_EMAIL`/`ADMIN_PASSWORD`;
+     deploy. Para reaplicar os planos do código uma vez: adicione `SEED_RESET_PLANS=1` no `forja-admin`
+     (Production), faça um *Redeploy* e **apague a variável** em seguida;
+   - cria a conta do dono a partir de `ADMIN_EMAIL`/`ADMIN_PASSWORD` (recusa os valores de exemplo do `.env.example`);
    - **nunca** cria a conta demo na Vercel.
 5. **Primeiro acesso ao painel**: entre com `ADMIN_EMAIL`/`ADMIN_PASSWORD`, ative o 2FA, cadastre as chaves dos
    provedores em **Chaves de API** e confira o câmbio. Uma chave usada por uma call de voz em andamento não pode ser

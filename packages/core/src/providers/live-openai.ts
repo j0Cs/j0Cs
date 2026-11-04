@@ -7,7 +7,10 @@
  * ainda não exercitados com uma chave real neste projeto.
  */
 /** OPENAI_BASE_URL permite apontar para um servidor de teste (mesma convenção do SDK oficial). */
-const base = () => `${(process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "")}/live/sessions`;
+const raiz = () => (process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
+const base = () => `${raiz()}/live/sessions`;
+/** Nenhuma chamada de desligamento pode prender a varredura: tudo com prazo. */
+const PRAZO_REST_MS = 5_000;
 
 export interface LiveSessionInput {
   apiKey: string;
@@ -53,21 +56,23 @@ export async function createLiveSession(input: LiveSessionInput): Promise<{ sess
 /**
  * Encerra a sessão pelo canal lateral (sideband), o caminho documentado para sessões WebRTC:
  * conecta em `wss://…/live/sessions/{id}/attach` com a chave, envia `session.close` e espera
- * o `session.closed` (que traz o motivo e o uso final em segundos). Resolve `ok: false` se
- * não conseguir conectar ou se o `session.closed` não chegar a tempo.
+ * o `session.closed` (que traz o motivo e o uso final em segundos).
+ * `abriu` diz se o canal chegou a conectar: se abriu e o `session.closed` não veio, a sessão
+ * existia e continua sem confirmação de fim.
  */
 export async function closeLiveSession(input: {
   apiKey: string;
   sessionId: string;
   timeoutMs?: number;
   WebSocketImpl?: typeof WebSocket;
-}): Promise<{ ok: boolean; reason?: string; usageSeconds?: number }> {
+}): Promise<{ ok: boolean; abriu: boolean; reason?: string; usageSeconds?: number }> {
   const Ws = input.WebSocketImpl ?? globalThis.WebSocket;
-  if (!Ws) return { ok: false };
+  if (!Ws) return { ok: false, abriu: false };
   const url = `${base().replace(/^http/, "ws")}/${encodeURIComponent(input.sessionId)}/attach`;
   return new Promise((resolve) => {
     let fim = false;
-    let ws: WebSocket;
+    let abriu = false;
+    let ws: WebSocket | undefined;
     const terminar = (r: { ok: boolean; reason?: string; usageSeconds?: number }) => {
       if (fim) return;
       fim = true;
@@ -77,9 +82,9 @@ export async function closeLiveSession(input: {
       } catch {
         // já fechado
       }
-      resolve(r);
+      resolve({ ...r, abriu });
     };
-    const timer = setTimeout(() => terminar({ ok: false }), input.timeoutMs ?? 8_000);
+    const timer = setTimeout(() => terminar({ ok: false }), input.timeoutMs ?? 6_000);
     try {
       // `headers` é extensão do WebSocket do Node (undici); o do navegador não aceita
       ws = new Ws(url, { headers: { authorization: `Bearer ${input.apiKey}` } } as unknown as string[]);
@@ -87,7 +92,10 @@ export async function closeLiveSession(input: {
       terminar({ ok: false });
       return;
     }
-    ws.onopen = () => ws.send(JSON.stringify({ type: "session.close" }));
+    ws.onopen = () => {
+      abriu = true;
+      ws?.send(JSON.stringify({ type: "session.close" }));
+    };
     ws.onmessage = (m) => {
       let e: { type?: string; reason?: string; usage?: { seconds?: number } };
       try {
@@ -103,22 +111,65 @@ export async function closeLiveSession(input: {
 }
 
 /**
- * Plano B: endpoint REST de desligamento. A documentação o cita ("called the hangup
- * endpoint") mas a referência lida não detalha o caminho para WebRTC. 404/409 = já encerrada.
+ * Plano B: endpoint REST de desligamento. A documentação o cita ("called the hangup endpoint"),
+ * mas a referência lida não detalha o caminho para WebRTC. Devolve o status HTTP (0 = sem resposta).
+ * Atenção: a OpenAI responde 404 antes de checar a chave em rotas de sessão, então 404 pode ser
+ * "já encerrada", "rota inexistente" ou "chave revogada".
  */
-export async function hangupLiveSession(input: { apiKey: string; sessionId: string; fetchImpl?: typeof fetch }) {
+export async function hangupLiveSession(input: { apiKey: string; sessionId: string; fetchImpl?: typeof fetch }): Promise<number> {
   const f = input.fetchImpl ?? fetch;
-  const res = await f(`${base()}/${encodeURIComponent(input.sessionId)}/hangup`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${input.apiKey}` },
-  });
-  return res.ok || res.status === 404 || res.status === 409;
+  try {
+    const res = await f(`${base()}/${encodeURIComponent(input.sessionId)}/hangup`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${input.apiKey}` },
+      signal: AbortSignal.timeout(PRAZO_REST_MS),
+    });
+    return res.status;
+  } catch {
+    return 0;
+  }
 }
 
-/** Desliga a sessão: canal lateral primeiro, REST como reserva. true = confirmado. */
-export async function endLiveSession(input: { apiKey: string; sessionId: string; timeoutMs?: number; WebSocketImpl?: typeof WebSocket; fetchImpl?: typeof fetch }) {
+/** A chave ainda é aceita pela OpenAI? (desempata um 404 ambíguo). null = não deu para saber. */
+async function chaveAceita(apiKey: string, fetchImpl?: typeof fetch): Promise<boolean | null> {
+  const f = fetchImpl ?? fetch;
+  try {
+    const res = await f(`${raiz()}/models`, { headers: { authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(PRAZO_REST_MS) });
+    if (res.status === 401 || res.status === 403) return false;
+    return res.ok ? true : null;
+  } catch {
+    return null;
+  }
+}
+
+export type FimDaSessao =
+  | { ok: true; via: "sideband"; confirmado: true; reason?: string; usageSeconds?: number }
+  | { ok: true; via: "hangup"; confirmado: boolean; status: number }
+  | { ok: false; status?: number; chaveRecusada?: boolean };
+
+/**
+ * Desliga a sessão: canal lateral primeiro, REST como reserva.
+ * - canal lateral confirmou (session.closed) → ok, confirmado;
+ * - REST 2xx ou 409 → ok, confirmado;
+ * - REST 404 depois de o canal lateral ABRIR sem fechar → a sessão estava viva: ok false (tentar de novo);
+ * - REST 404 sem o canal ter aberto → provavelmente já encerrada (o navegador manda session.close antes):
+ *   confirma que a chave ainda vale; se a chave foi recusada, devolve chaveRecusada.
+ */
+export async function endLiveSession(input: {
+  apiKey: string;
+  sessionId: string;
+  timeoutMs?: number;
+  WebSocketImpl?: typeof WebSocket;
+  fetchImpl?: typeof fetch;
+}): Promise<FimDaSessao> {
   const lateral = await closeLiveSession(input);
-  if (lateral.ok) return { ok: true as const, via: "sideband" as const, reason: lateral.reason, usageSeconds: lateral.usageSeconds };
-  const rest = await hangupLiveSession(input).catch(() => false);
-  return rest ? { ok: true as const, via: "hangup" as const } : { ok: false as const };
+  if (lateral.ok) return { ok: true, via: "sideband", confirmado: true, reason: lateral.reason, usageSeconds: lateral.usageSeconds };
+  const status = await hangupLiveSession(input);
+  if ((status >= 200 && status < 300) || status === 409) return { ok: true, via: "hangup", confirmado: true, status };
+  if (status === 404 && !lateral.abriu) {
+    const aceita = await chaveAceita(input.apiKey, input.fetchImpl);
+    if (aceita === false) return { ok: false, status, chaveRecusada: true };
+    if (aceita === true) return { ok: true, via: "hangup", confirmado: false, status };
+  }
+  return { ok: false, status };
 }

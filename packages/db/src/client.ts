@@ -25,9 +25,31 @@ export function sslConfig(env = process.env): pg.PoolConfig["ssl"] {
  */
 export function semParametrosSsl(connectionString: string, env = process.env): string {
   if (!sslConfig(env)) return connectionString;
-  const url = new URL(connectionString);
+  let url: URL;
+  try {
+    url = new URL(connectionString);
+  } catch {
+    // URL que o parser não entende: o erro do Node traria a URL inteira (com a senha) no log.
+    // Devolve como veio; o `pg` trata e omite a senha nas mensagens de erro dele.
+    return connectionString;
+  }
   for (const p of ["sslmode", "ssl", "sslcert", "sslkey", "sslrootcert", "uselibpqcompat"]) url.searchParams.delete(p);
   return url.toString();
+}
+
+/**
+ * Porta da URL do banco sem nunca vazar a senha: se a URL não for válida, o erro do Node incluiria
+ * a URL inteira (campo `input`). Lança uma mensagem limpa, sem `cause`.
+ */
+export function portaDaUrl(connectionString: string, nome: string): string {
+  try {
+    return new URL(connectionString).port;
+  } catch {
+    throw new Error(
+      `${nome} inválida. Se a senha do banco tem caracteres especiais (/ ? # @ % :), escreva-os codificados ` +
+        "(%2F %3F %23 %40 %25 %3A) ou troque por uma senha só com letras e números.",
+    );
+  }
 }
 
 /**

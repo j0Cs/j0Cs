@@ -50,6 +50,9 @@ export function CallRoom(props: {
   const [agora, setAgora] = useState(0);
   const [mudo, setMudo] = useState(false);
   const [modelo, setModelo] = useState(props.modeloPadrao);
+  /** Os motores guardam os callbacks do momento em que a call começou: leem o modelo por aqui. */
+  const modeloRef = useRef(modelo);
+  modeloRef.current = modelo;
   const [erro, setErro] = useState<string | null>(null);
   const [atualizandoSpec, setAtualizandoSpec] = useState(false);
   const [digitado, setDigitado] = useState("");
@@ -160,7 +163,7 @@ export function CallRoom(props: {
         body: JSON.stringify({
           projectId: projectId.current,
           conversationId: conversationId.current,
-          modelId: modelo,
+          modelId: modeloRef.current,
           message: t,
           modo: "call",
         }),
@@ -235,7 +238,7 @@ export function CallRoom(props: {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId: projectId.current, conversationId: conversationId.current, modelId: modelo, message: pedido, modo: "call" }),
+        body: JSON.stringify({ projectId: projectId.current, conversationId: conversationId.current, modelId: modeloRef.current, message: pedido, modo: "call" }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) throw new ErroHttp(res.status, (await res.text()) || `Erro ${res.status}`);
@@ -418,6 +421,7 @@ export function CallRoom(props: {
               <select
                 value={modelo}
                 onChange={(e) => setModelo(e.target.value)}
+                disabled={fase === "conectando"}
                 className="w-full bg-transparent text-aco-100 focus:outline-none"
                 aria-label="Modelo usado na call"
               >
@@ -464,7 +468,7 @@ export function CallRoom(props: {
                 name="tipoVoz"
                 value={o.id}
                 checked={tipoVoz === o.id}
-                disabled={!o.ok}
+                disabled={!o.ok || fase === "conectando"}
                 onChange={() => setTipoVoz(o.id)}
                 className="sr-only"
               />

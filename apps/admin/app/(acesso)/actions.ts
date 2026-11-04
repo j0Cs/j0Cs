@@ -1,6 +1,7 @@
 "use server";
 
 import { authErrorMessage, getAdminAuth } from "@forja/auth";
+import { consumeRateLimit, getDb } from "@forja/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import QRCode from "qrcode";
@@ -11,17 +12,44 @@ export type SetupState = State & { qr?: string; secret?: string; backupCodes?: s
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
+/** Mesma resposta de senha errada: o painel não pode confirmar a senha de contas de clientes. */
+const CREDENCIAIS_INVALIDAS = "E-mail ou senha incorretos.";
+const MUITAS_TENTATIVAS = "Muitas tentativas. Espere alguns minutos e tente de novo.";
+
 async function rejectNonStaff(platformRole: unknown): Promise<State | null> {
   if (platformRole === "staff") return null;
   await getAdminAuth().api.signOut({ headers: await headers() });
-  return { error: "Esta conta não tem acesso ao painel." };
+  return { error: CREDENCIAIS_INVALIDAS };
+}
+
+/** IP do cliente (a Vercel preenche x-forwarded-for). */
+async function ipDoCliente() {
+  const h = await headers();
+  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "desconhecido";
+}
+
+/**
+ * Chamadas diretas a auth.api.* não passam pelo limitador do Better Auth: limites próprios.
+ * Por IP e pelo par (e-mail, IP): um atacante não consegue travar o login do dono a partir de outro IP.
+ */
+async function dentroDoLimite(chaves: [string, number, number][]) {
+  const db = getDb();
+  for (const [chave, limite, janela] of chaves) {
+    if (!(await consumeRateLimit(db, chave, limite, janela))) return false;
+  }
+  return true;
 }
 
 export async function signInAction(_: State, f: FormData): Promise<State> {
   let next = "/";
+  const ip = await ipDoCliente();
+  const email = str(f, "email").toLowerCase();
+  if (!(await dentroDoLimite([[`admin:login:ip:${ip}`, 20, 900], [`admin:login:par:${email}:${ip}`, 8, 900]]))) {
+    return { error: MUITAS_TENTATIVAS };
+  }
   try {
     const res = await getAdminAuth().api.signInEmail({
-      body: { email: str(f, "email").toLowerCase(), password: String(f.get("password") ?? "") },
+      body: { email, password: String(f.get("password") ?? "") },
       headers: await headers(),
     });
     if ("twoFactorRedirect" in res && res.twoFactorRedirect) {
@@ -39,6 +67,7 @@ export async function signInAction(_: State, f: FormData): Promise<State> {
 /** Segunda etapa do login: código do app autenticador ou código de backup. */
 export async function verifyTwoFactorAction(_: State, f: FormData): Promise<State> {
   const code = str(f, "code").replace(/\s/g, "");
+  if (!(await dentroDoLimite([[`admin:2fa:ip:${await ipDoCliente()}`, 20, 900]]))) return { error: MUITAS_TENTATIVAS };
   try {
     const api = getAdminAuth().api;
     const res =

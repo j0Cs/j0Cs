@@ -21,7 +21,19 @@ export async function garantirProjeto(
     });
     if (existente) return { id: existente.id, criado: false };
   }
-  // trava por organização: duas abas criando projeto ao mesmo tempo não furam o limite do plano
+  const r = await criarProjetoNoLimite(db, ctx, { orgId: ctx.orgId, name: titulo(nomeSugerido), createdBy: ctx.userId });
+  return "erro" in r ? { erro: `${r.erro} Escolha um projeto existente ou arquive um.` } : { id: r.id, criado: true };
+}
+
+/**
+ * Cria um projeto respeitando o limite do plano, com trava por organização: requisições
+ * simultâneas (duas abas, um script) não furam o limite. Use em TODO lugar que cria projeto.
+ */
+export async function criarProjetoNoLimite(
+  db: Db,
+  ctx: { orgId: string; maxProjects: number | null | undefined },
+  valores: typeof schema.projects.$inferInsert,
+): Promise<{ id: string } | { erro: string }> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ctx.orgId}))`);
     if (ctx.maxProjects != null) {
@@ -29,14 +41,9 @@ export async function garantirProjeto(
         .select({ n: sql<number>`count(*)::int` })
         .from(schema.projects)
         .where(and(eq(schema.projects.orgId, ctx.orgId), isNull(schema.projects.archivedAt)));
-      if ((row?.n ?? 0) >= ctx.maxProjects) {
-        return { erro: `Seu plano permite ${ctx.maxProjects} projetos ativos. Escolha um projeto existente ou arquive um.` };
-      }
+      if ((row?.n ?? 0) >= ctx.maxProjects) return { erro: `Seu plano permite ${ctx.maxProjects} projetos ativos.` };
     }
-    const [novo] = await tx
-      .insert(schema.projects)
-      .values({ orgId: ctx.orgId, name: titulo(nomeSugerido), createdBy: ctx.userId })
-      .returning({ id: schema.projects.id });
-    return { id: novo!.id, criado: true };
+    const [novo] = await tx.insert(schema.projects).values({ ...valores, orgId: ctx.orgId }).returning({ id: schema.projects.id });
+    return { id: novo!.id };
   });
 }

@@ -149,3 +149,4 @@ export function getAdminAuth(): AdminAuth {
 export { hashPassword } from "better-auth/crypto";
 export { sendEmail, emailLayout, escapeHtml } from "./email";
 export { authErrorMessage } from "./errors";
+export { caminhoInterno } from "./redirect";

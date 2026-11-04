@@ -7,4 +7,4 @@ export { anthropicAdapter } from "./providers/anthropic";
 export { googleAdapter } from "./providers/google";
 export { openaiAdapter, xaiAdapter } from "./providers/openai";
 export { verifyProviderKey } from "./providers/verify";
-export { closeLiveSession, createLiveSession, endLiveSession, hangupLiveSession } from "./providers/live-openai";
+export { closeLiveSession, createLiveSession, endLiveSession, hangupLiveSession, type FimDaSessao } from "./providers/live-openai";

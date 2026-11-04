@@ -36,6 +36,11 @@ export class ErroDeVoz extends Error {
 
 /** Tempo que um "disconnected" do WebRTC tem para voltar sozinho (perda curta de pacotes). */
 const TOLERANCIA_QUEDA_MS = 10_000;
+/**
+ * Prazo para o WebRTC chegar a "connected" depois da troca de SDP (redes que bloqueiam UDP nunca
+ * chegam). Abaixo dos 30 s em que o servidor ainda isenta uma conexão que falhou.
+ */
+const PRAZO_CONEXAO_MS = 15_000;
 
 export interface EventosNuvem {
   /** Legenda ao vivo (parcial) de quem está falando. */
@@ -95,7 +100,12 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
   let audio: HTMLAudioElement | null = null;
   let nivelMic: () => number = () => 0;
   let nivelVoz: () => number = () => 0;
+  /** Id da reserva, gerado aqui: o servidor usa o mesmo id, então dá para cancelar antes da resposta. */
   let sessaoId: string | null = null;
+  /** A reserva já foi pedida ao servidor (a partir daí, sair da página precisa avisar). */
+  let reservaEnviada = false;
+  /** Acorda a espera pela conexão quando a chamada é encerrada no meio dela. */
+  let acordarEspera: (() => void) | null = null;
   let pulso: ReturnType<typeof setInterval> | null = null;
   let queda: ReturnType<typeof setTimeout> | null = null;
   /** Encerrada (ou cancelada durante a conexão): nada mais pode ligar mic, pulso ou áudio. */
@@ -115,11 +125,12 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
       body: JSON.stringify({ sessaoId, falhou }),
     });
 
-  // aba fechada ou recarregada: avisa o servidor na hora (cobrança justa e desligamento imediato)
+  // aba fechada ou recarregada: avisa o servidor na hora (cobrança justa e desligamento imediato).
+  // Vale desde o pedido da reserva: fechar a aba durante "Conectando…" também fecha a sessão.
   const aoSair = () => {
-    if (encerrada || !sessaoId) return;
+    if (encerrada || !reservaEnviada) return;
     encerrada = true;
-    navigator.sendBeacon("/api/call/voz/fim", new Blob([JSON.stringify({ sessaoId })], { type: "application/json" }));
+    navigator.sendBeacon("/api/call/voz/fim", new Blob([JSON.stringify({ sessaoId, falhou: !conectada })], { type: "application/json" }));
   };
 
   /** Solta tudo o que foi alocado até agora. Idempotente. */
@@ -151,6 +162,7 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
   const finalizar = async (motivo: string) => {
     if (encerrada) return;
     encerrada = true;
+    acordarEspera?.();
     if (pulso) clearInterval(pulso);
     // o microfone para na hora; a conexão fica aberta até o servidor confirmar o fim
     mic?.getTracks().forEach((t) => t.stop());
@@ -166,10 +178,10 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
     if (conectada) ev.onEncerrada(motivo);
   };
 
-  /** Saiu no meio da conexão: solta tudo e, se a sessão já existe, fecha sem cobrar. */
+  /** Saiu no meio da conexão: solta tudo e, se a reserva já foi pedida, fecha sem cobrar. */
   const cancelar = async (): Promise<never> => {
     liberar();
-    if (sessaoId) await avisarFim(true).catch(() => undefined);
+    if (reservaEnviada) await avisarFim(true).catch(() => undefined);
     throw new ErroDeVoz("Chamada cancelada.", true);
   };
 
@@ -194,6 +206,11 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
           nivelVoz = medidor(remoto, ctx);
         };
         pc.onconnectionstatechange = () => {
+          // antes de conectar, quem decide é a espera da conexão (abaixo)
+          if (!conectada) {
+            acordarEspera?.();
+            return;
+          }
           const estado = pc?.connectionState;
           if (estado === "connected" && queda) {
             clearTimeout(queda);
@@ -239,11 +256,14 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
         const oferta = await pc.createOffer();
         await pc.setLocalDescription(oferta);
         if (encerrada) return await cancelar();
-        // a requisição NÃO é abortada ao cancelar: precisamos do id para fechar a sessão no provedor
+        // A requisição NÃO é abortada ao cancelar: o servidor termina e /fim fecha a sessão pelo id.
+        sessaoId = crypto.randomUUID();
+        reservaEnviada = true;
+        window.addEventListener("pagehide", aoSair, { once: true });
         const res = await fetch("/api/call/voz/sessao", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sdp: oferta.sdp, projeto }),
+          body: JSON.stringify({ sdp: oferta.sdp, projeto, reserva: sessaoId }),
         });
         const dados = (await res.json().catch(() => ({}))) as {
           erro?: string;
@@ -252,14 +272,12 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
           projectId?: string;
           conversationId?: string;
         };
-        if (dados.sessaoId) sessaoId = dados.sessaoId;
         if (encerrada) return await cancelar();
-        if (!res.ok || !dados.sdp || !dados.sessaoId) {
+        if (!res.ok || !dados.sdp || dados.sessaoId !== sessaoId) {
           liberar();
-          if (sessaoId) await avisarFim(true).catch(() => undefined);
+          await avisarFim(true).catch(() => undefined);
           throw new ErroDeVoz(dados.erro ?? "Não foi possível abrir a chamada agora.");
         }
-        window.addEventListener("pagehide", aoSair, { once: true });
         try {
           await pc.setRemoteDescription({ type: "answer", sdp: dados.sdp });
         } catch (err) {
@@ -270,6 +288,27 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
           throw new ErroDeVoz("Não foi possível conectar a voz natural agora.");
         }
         if (encerrada) return await cancelar();
+        // SDP aceito ainda não é conexão: só cobra (pulsos) depois de o áudio poder passar
+        const conectou = await new Promise<boolean>((resolve) => {
+          const prazo = setTimeout(() => {
+            acordarEspera = null;
+            resolve(false);
+          }, PRAZO_CONEXAO_MS);
+          acordarEspera = () => {
+            const estado = pc?.connectionState;
+            if (!encerrada && estado !== "connected" && estado !== "failed" && estado !== "closed") return;
+            clearTimeout(prazo);
+            acordarEspera = null;
+            resolve(!encerrada && estado === "connected");
+          };
+          acordarEspera();
+        });
+        if (encerrada) return await cancelar();
+        if (!conectou) {
+          liberar();
+          await avisarFim(true).catch(() => undefined);
+          throw new ErroDeVoz("A voz natural não conseguiu conectar nesta rede.");
+        }
         conectada = true;
 
         pulso = setInterval(async () => {
@@ -292,7 +331,7 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
         // qualquer falha (microfone negado, rede, resposta sem JSON): nada fica ligado
         if (!(err instanceof ErroDeVoz)) {
           liberar();
-          if (sessaoId) await avisarFim(true).catch(() => undefined);
+          if (reservaEnviada) await avisarFim(true).catch(() => undefined);
         }
         // encerrada no meio do caminho (ex.: saiu da página): o erro é consequência do cancelamento
         if (encerrada && !(err instanceof ErroDeVoz && err.cancelada)) throw new ErroDeVoz("Chamada cancelada.", true);

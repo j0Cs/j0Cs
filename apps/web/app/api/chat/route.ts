@@ -4,6 +4,7 @@ import { and, asc, createGatewayStore, eq, schema } from "@forja/db";
 import { callSystemPrompt } from "@/lib/call";
 import { firstName } from "@/lib/persona";
 import { getApiSession } from "@/lib/session";
+import { waitUntil } from "@vercel/functions";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -99,8 +100,21 @@ export async function POST(request: Request) {
   const effort = EFFORTS.includes(body.effort as Effort) ? (body.effort as Effort) : call ? "low" : undefined;
   const encoder = new TextEncoder();
 
+  /*
+   * A geração NÃO é ligada à conexão do navegador: se a pessoa interromper (botão parar, falar por
+   * cima na call, fechar a aba), o modelo termina a resposta, que é salva na conversa e cobrada
+   * pelo uso real informado pelo provedor. Cancelar no meio obrigaria a estimar tokens (raciocínio
+   * e escrita de cache não aparecem no texto) e cobrar abaixo do custo. waitUntil mantém a função
+   * viva depois que o cliente sai.
+   */
+  const projectId = project.id;
   const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
+    start(controller) {
+      waitUntil(gerar(controller));
+    },
+  });
+
+  async function gerar(controller: ReadableStreamDefaultController<Uint8Array>) {
       // Se o cliente desconectar, enqueue lança: ignoramos e seguimos até o gateway registrar o uso.
       const send = (event: unknown) => {
         try {
@@ -117,13 +131,12 @@ export async function POST(request: Request) {
           {
             orgId: org.id,
             userId: user.id,
-            projectId: project.id,
+            projectId,
             conversationId: conv.id,
             modelId: body.modelId!,
             system,
             messages: history,
             effort,
-            signal: request.signal,
           },
         )) {
           if (event.type === "text") answer += event.text;
@@ -152,8 +165,7 @@ export async function POST(request: Request) {
           // já fechado pelo cliente
         }
       }
-    },
-  });
+  }
 
   return new Response(stream, {
     headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store" },

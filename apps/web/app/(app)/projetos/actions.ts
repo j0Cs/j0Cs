@@ -3,6 +3,7 @@
 import { and, eq, isNull, schema, sql } from "@forja/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { criarProjetoNoLimite } from "@/lib/projects";
 import { getSession } from "@/lib/session";
 
 export async function createProject(formData: FormData) {
@@ -14,23 +15,15 @@ export async function createProject(formData: FormData) {
   const repoFullName = String(formData.get("repoFullName") ?? "").trim() || null;
   if (!name) throw new Error("Dê um nome ao projeto.");
 
-  if (plan?.maxProjects != null) {
-    const [row] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(schema.projects)
-      .where(and(eq(schema.projects.orgId, org.id), isNull(schema.projects.archivedAt)));
-    if ((row?.n ?? 0) >= plan.maxProjects) {
-      throw new Error(`Seu plano permite até ${plan.maxProjects} projetos ativos.`);
-    }
-  }
-
-  const [project] = await db
-    .insert(schema.projects)
-    .values({ orgId: org.id, name, description, defaultModelId, instructions, repoFullName, createdBy: user.id })
-    .returning({ id: schema.projects.id });
+  const project = await criarProjetoNoLimite(
+    db,
+    { orgId: org.id, maxProjects: plan?.maxProjects },
+    { orgId: org.id, name, description, defaultModelId, instructions, repoFullName, createdBy: user.id },
+  );
+  if ("erro" in project) throw new Error(project.erro);
 
   revalidatePath("/projetos");
-  redirect(`/projetos/${project!.id}`);
+  redirect(`/projetos/${project.id}`);
 }
 
 export async function archiveProject(formData: FormData) {

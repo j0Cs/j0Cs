@@ -14,3 +14,11 @@ export async function consumeRateLimit(db: Db, key: string, limit: number, windo
     returning count`);
   return Number(rows[0]?.count ?? 0) <= limit;
 }
+
+/** Contagem atual da janela (sem consumir). 0 se a chave não existe ou a janela venceu. */
+export async function rateLimitCount(db: Db, key: string, windowSeconds: number): Promise<number> {
+  const { rows } = await db.execute<{ count: number }>(sql`
+    select count from rate_limits
+    where key = ${key} and window_start >= now() - make_interval(secs => ${windowSeconds})`);
+  return Number(rows[0]?.count ?? 0);
+}

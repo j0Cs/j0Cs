@@ -1,4 +1,4 @@
-import { isGithubLoginEnabled } from "@forja/auth";
+import { caminhoInterno, isGithubLoginEnabled } from "@forja/auth";
 import { buttonClass, Field, inputClass, Notice } from "@forja/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -10,7 +10,8 @@ export const metadata = { title: "Entrar" };
 
 export default async function SignInPage({ searchParams }: { searchParams: Promise<{ convite?: string; senha?: string; next?: string }> }) {
   const { convite, senha, next } = await searchParams;
-  const after = convite ? `/convite/${convite}` : (next ?? "/central");
+  // o "voltar para" vem da URL: só caminhos deste site (vale também para quem já está logado)
+  const after = caminhoInterno(convite ? `/convite/${encodeURIComponent(convite)}` : next);
   if (await getAuthUser()) redirect(after);
 
   return (

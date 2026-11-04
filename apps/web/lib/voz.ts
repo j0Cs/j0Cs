@@ -1,5 +1,5 @@
 import { computeChargeBrlMicros, VOICE_PRODUCTS, voiceCostUsdMicros, type VoiceProduct } from "@forja/core";
-import { decryptSecret, endLiveSession } from "@forja/core/server";
+import { decryptSecret, endLiveSession, type FimDaSessao } from "@forja/core/server";
 import { and, createGatewayStore, eq, getPricingSettings, inArray, schema, sql, type Db } from "@forja/db";
 import { ASSISTANT_NAME } from "./persona";
 
@@ -43,6 +43,8 @@ export async function vozNuvemDisponivel(db: Db, orgId: string) {
  */
 export async function cobrarAte(db: Db, sessao: Sessao, ate: Date) {
   if (sessao.status !== "active" && sessao.status !== "closing") return { cobrado: 0, saldo: null as number | null };
+  // conexão que não fechou: a plataforma decidiu absorver, nem a retentativa da varredura cobra
+  if (sessao.status === "closing" && sessao.endReason?.startsWith("falha-conexao")) return { cobrado: 0, saldo: null as number | null };
   const limite = sessao.status === "closing" ? Math.min(ate.getTime(), (sessao.endedAt ?? sessao.lastPulseAt).getTime()) : ate.getTime();
   const total = Math.max(PULSO_SEGUNDOS, Math.floor((limite - sessao.startedAt.getTime()) / 1000));
   const novos = total - sessao.billedSeconds;
@@ -85,45 +87,56 @@ export async function cobrarAte(db: Db, sessao: Sessao, ate: Date) {
 
 /**
  * Desliga no provedor e só então marca como fechada. Ao entrar em "closing" grava ended_at
- * (fim da cobrança). Se o desligamento falhar, a varredura tenta de novo a cada minuto; sem
- * chave para desligar (apagada) ou falhando há DESISTIR_DESLIGAMENTO_MINUTOS, fecha mesmo
- * assim, com alerta no log, para não prender o usuário (índice de uma call por usuário).
+ * (fim da cobrança: `fimCobranca`, ou agora). Se o desligamento não for confirmado, a varredura
+ * tenta de novo a cada minuto. Fecha mesmo assim, com alerta `critical` no log, para não
+ * prender o usuário (índice de uma call por pessoa), quando: não há chave para desligar, a
+ * OpenAI recusou a chave, ou o prazo de DESISTIR_DESLIGAMENTO_MINUTOS passou (conferido ANTES
+ * de chamar o provedor, para um provedor lento não segurar a desistência).
  */
-export async function encerrarSessao(db: Db, sessao: Sessao, motivo: string): Promise<boolean> {
+export async function encerrarSessao(db: Db, sessao: Sessao, motivo: string, fimCobranca?: Date): Promise<boolean> {
   if (sessao.status === "closed") return true;
-  await db
+  // estado atual da linha: a cópia de quem chamou pode estar velha (ex.: /fim lido durante a
+  // reserva, antes de /sessao gravar o id da sessão no provedor)
+  const [transicao] = await db
     .update(schema.voiceSessions)
-    .set({ status: "closing", endReason: motivo, endedAt: new Date() })
-    .where(and(eq(schema.voiceSessions.id, sessao.id), inArray(schema.voiceSessions.status, ["connecting", "active"])));
+    .set({ status: "closing", endReason: motivo, endedAt: fimCobranca ?? new Date() })
+    .where(and(eq(schema.voiceSessions.id, sessao.id), inArray(schema.voiceSessions.status, ["connecting", "active"])))
+    .returning();
+  const atual = transicao ?? (await db.query.voiceSessions.findFirst({ where: eq(schema.voiceSessions.id, sessao.id) }));
+  if (!atual || atual.status === "closed") return true;
 
-  let desligou = sessao.providerSessionId === "pendente"; // nunca chegou a existir no provedor
+  let desligou = atual.providerSessionId === "pendente"; // nunca chegou a existir no provedor
   let semVolta: string | null = null;
-  if (!desligou) {
+  const vencido = !transicao && atual.endedAt && Date.now() - atual.endedAt.getTime() >= DESISTIR_DESLIGAMENTO_MINUTOS * 60_000;
+  if (!desligou && vencido) semVolta = "desligamento-abandonado";
+  if (!desligou && !semVolta) {
     // usa a MESMA chave que abriu a sessão (nada de cair numa chave de outro projeto)
-    const chave = sessao.providerKeyId
-      ? await db.query.providerKeys.findFirst({ where: eq(schema.providerKeys.id, sessao.providerKeyId) })
+    const chave = atual.providerKeyId
+      ? await db.query.providerKeys.findFirst({ where: eq(schema.providerKeys.id, atual.providerKeyId) })
       : null;
-    const apiKey = chave ? decryptSecret(chave.encryptedKey) : sessao.providerKeyId ? null : process.env.OPENAI_API_KEY;
+    const apiKey = chave ? decryptSecret(chave.encryptedKey) : atual.providerKeyId ? null : process.env.OPENAI_API_KEY;
     if (apiKey) {
-      const r = await endLiveSession({ apiKey, sessionId: sessao.providerSessionId }).catch(() => ({ ok: false as const }));
+      const r: FimDaSessao = await endLiveSession({ apiKey, sessionId: atual.providerSessionId }).catch(() => ({ ok: false as const }));
       desligou = r.ok;
-      if (r.ok && "usageSeconds" in r && r.usageSeconds !== undefined) {
-        // conciliação: segundos que o provedor cobrou x segundos que cobramos do cliente
-        console.log(JSON.stringify({ level: "info", msg: "call desligada", sessao: sessao.id, via: r.via, motivo: r.reason, segundosProvedor: r.usageSeconds, segundosCobrados: sessao.billedSeconds }));
-      }
+      if (!r.ok && r.chaveRecusada) semVolta = "chave-recusada";
+      // todo resultado vai para o log: conciliação (segundos do provedor x cobrados) e diagnóstico
+      const registro = {
+        msg: r.ok ? (r.confirmado ? "call desligada" : "call dada como desligada sem confirmação") : "desligamento não confirmado",
+        sessao: atual.id,
+        motivo,
+        segundosCobrados: atual.billedSeconds,
+        ...(r.ok && r.via === "sideband" ? { via: r.via, motivoProvedor: r.reason, segundosProvedor: r.usageSeconds } : {}),
+        ...(r.ok && r.via === "hangup" ? { via: r.via, status: r.status } : {}),
+        ...(!r.ok ? { status: r.status } : {}),
+      };
+      const nivel = r.ok && r.confirmado ? "info" : r.ok ? "warn" : "error";
+      console[nivel === "info" ? "log" : nivel === "warn" ? "warn" : "error"](JSON.stringify({ level: nivel, ...registro }));
     } else semVolta = "sem-chave-para-desligar";
   }
-  if (!desligou && !semVolta) {
-    const desde = (sessao.status === "closing" ? sessao.endedAt : null) ?? new Date();
-    if (Date.now() - desde.getTime() >= DESISTIR_DESLIGAMENTO_MINUTOS * 60_000) semVolta = "desligamento-abandonado";
-  }
-  if (!desligou && !semVolta) {
-    console.error(JSON.stringify({ level: "error", msg: "hangup falhou; nova tentativa na varredura", sessao: sessao.id }));
-    return false;
-  }
+  if (!desligou && !semVolta) return false; // nova tentativa na próxima varredura
   if (semVolta) {
     // A sessão pode seguir aberta no provedor até o limite dele: custo da plataforma. Investigar a chave.
-    console.error(JSON.stringify({ level: "critical", msg: "call fechada sem confirmar desligamento no provedor", motivo: semVolta, sessao: sessao.id, chave: sessao.providerKeyId }));
+    console.error(JSON.stringify({ level: "critical", msg: "call fechada sem confirmar desligamento no provedor", motivo: semVolta, sessao: atual.id, chave: atual.providerKeyId }));
   }
   await db
     .update(schema.voiceSessions)
@@ -132,6 +145,6 @@ export async function encerrarSessao(db: Db, sessao: Sessao, motivo: string): Pr
       endedAt: sql`coalesce(${schema.voiceSessions.endedAt}, now())`,
       ...(semVolta ? { endReason: sql`coalesce(${schema.voiceSessions.endReason}, '') || ${"+" + semVolta}` } : {}),
     })
-    .where(eq(schema.voiceSessions.id, sessao.id));
+    .where(eq(schema.voiceSessions.id, atual.id));
   return true;
 }

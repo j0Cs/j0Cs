@@ -1,7 +1,7 @@
 "use server";
 
-import { authErrorMessage, getWebAuth } from "@forja/auth";
-import { acceptInvitation, consumeRateLimit, createOrganizationForUser, getDb, OrgError } from "@forja/db";
+import { authErrorMessage, caminhoInterno, getWebAuth } from "@forja/auth";
+import { acceptInvitation, consumeRateLimit, createOrganizationForUser, getDb, OrgError, rateLimitCount } from "@forja/db";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { FormState } from "@/components/action-form";
@@ -9,19 +9,8 @@ import { ACTIVE_ORG_COOKIE, getAuthUser } from "@/lib/session";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
-/**
- * Só aceita caminhos internos para o "voltar para" (evita redirecionamento aberto).
- * Rejeita "//x", "/\\x" e caracteres de controle, que navegadores tratam como outro host.
- */
-function safeNext(v: string) {
-  if (!v.startsWith("/") || /[\\\s]/.test(v)) return "/central";
-  try {
-    const u = new URL(v, "http://interno.invalid");
-    return u.origin === "http://interno.invalid" ? u.pathname + u.search + u.hash : "/central";
-  } catch {
-    return "/central";
-  }
-}
+/** Só aceita caminhos internos para o "voltar para" (regra única em @forja/auth, com testes). */
+const safeNext = (v: string) => caminhoInterno(v);
 
 const LIMITE_NOME = 80;
 
@@ -41,6 +30,15 @@ async function dentroDoLimite(chaves: [string, number, number][]) {
 }
 const MUITAS = { error: "Muitas tentativas. Aguarde alguns minutos e tente de novo." };
 
+/**
+ * Login: o limite por conta conta só FALHAS, por par (e-mail, IP) e com um teto global maior
+ * por e-mail. Assim um atacante de um IP não trava a conta de outra pessoa, e adivinhar senha
+ * a partir de muitos IPs continua limitado.
+ */
+const FALHAS_POR_PAR = 8;
+const FALHAS_POR_EMAIL = 50;
+const JANELA_LOGIN = 900;
+
 async function setActiveOrg(orgId: string) {
   (await cookies()).set(ACTIVE_ORG_COOKIE, orgId, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
 }
@@ -48,13 +46,20 @@ async function setActiveOrg(orgId: string) {
 export async function signInAction(_: FormState, f: FormData): Promise<FormState> {
   const ip = await ipDoCliente();
   const email = str(f, "email").toLowerCase();
-  if (!(await dentroDoLimite([[`login:ip:${ip}`, 30, 900], [`login:email:${email}`, 10, 900]]))) return MUITAS;
+  const db = getDb();
+  const par = `login:falhas:${email}:${ip}`;
+  const global = `login:falhas:${email}`;
+  if (!(await dentroDoLimite([[`login:ip:${ip}`, 30, JANELA_LOGIN]]))) return MUITAS;
+  if ((await rateLimitCount(db, par, JANELA_LOGIN)) >= FALHAS_POR_PAR) return MUITAS;
+  if ((await rateLimitCount(db, global, JANELA_LOGIN)) >= FALHAS_POR_EMAIL) return MUITAS;
   try {
     await getWebAuth().api.signInEmail({
-      body: { email: str(f, "email"), password: String(f.get("password") ?? ""), rememberMe: true },
+      body: { email, password: String(f.get("password") ?? ""), rememberMe: true },
       headers: await headers(),
     });
   } catch (err) {
+    await consumeRateLimit(db, par, FALHAS_POR_PAR, JANELA_LOGIN);
+    await consumeRateLimit(db, global, FALHAS_POR_EMAIL, JANELA_LOGIN);
     return { error: authErrorMessage(err) };
   }
   redirect(safeNext(str(f, "next")));
@@ -94,9 +99,19 @@ export async function signUpAction(_: FormState, f: FormData): Promise<FormState
   redirect("/central");
 }
 
+/**
+ * E-mails para um endereço: por par (e-mail, IP) e um teto por endereço, em baldes separados para
+ * link mágico e redefinição de senha (esgotar um não fecha o outro caminho de volta para a conta).
+ */
+const limitesDeEmail = (fluxo: "magico" | "senha", email: string, ip: string): [string, number, number][] => [
+  [`email:ip:${ip}`, 10, 900],
+  [`email:${fluxo}:${email}:${ip}`, 3, 900],
+  [`email:${fluxo}:${email}`, 10, 900],
+];
+
 export async function magicLinkAction(_: FormState, f: FormData): Promise<FormState> {
   const email = str(f, "email").toLowerCase();
-  if (!(await dentroDoLimite([[`email:ip:${await ipDoCliente()}`, 10, 900], [`email:para:${email}`, 3, 900]]))) return MUITAS;
+  if (!(await dentroDoLimite(limitesDeEmail("magico", email, await ipDoCliente())))) return MUITAS;
   try {
     await getWebAuth().api.signInMagicLink({
       body: { email, callbackURL: safeNext(str(f, "next")) },
@@ -118,7 +133,7 @@ export async function githubAction(f: FormData) {
 
 export async function requestResetAction(_: FormState, f: FormData): Promise<FormState> {
   const email = str(f, "email").toLowerCase();
-  if (!(await dentroDoLimite([[`email:ip:${await ipDoCliente()}`, 10, 900], [`email:para:${email}`, 3, 900]]))) return MUITAS;
+  if (!(await dentroDoLimite(limitesDeEmail("senha", email, await ipDoCliente())))) return MUITAS;
   try {
     await getWebAuth().api.requestPasswordReset({
       body: { email, redirectTo: "/redefinir-senha" },

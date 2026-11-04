@@ -107,8 +107,24 @@ async function ensureUser(input: { email: string; name: string; password: string
   return u!;
 }
 
+/** Banco no próprio computador (Docker do `pnpm db:up`)? Só nele a conta demo pode existir. */
+function bancoLocal(): boolean {
+  try {
+    const host = new URL(process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL || "").hostname;
+    return ["localhost", "127.0.0.1", "::1", "[::1]", "postgres"].includes(host);
+  } catch {
+    return false;
+  }
+}
+
+// Valores de exemplo do .env.example: credenciais públicas no repositório, nunca viram conta staff.
+const SENHA_DE_EXEMPLO = "troque-esta-senha";
+const EMAIL_DE_EXEMPLO = "voce@suaempresa.com.br";
+
 // Equipe do dono (painel admin). Na primeira entrada o painel exige configurar o 2FA.
-if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
+if (process.env.ADMIN_PASSWORD === SENHA_DE_EXEMPLO || process.env.ADMIN_EMAIL?.toLowerCase() === EMAIL_DE_EXEMPLO) {
+  console.warn("↷ conta do painel NÃO criada: ADMIN_EMAIL/ADMIN_PASSWORD ainda são os valores de exemplo do .env.example");
+} else if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
   const staff = await ensureUser({
     email: process.env.ADMIN_EMAIL.toLowerCase(),
     name: "Administrador",
@@ -118,9 +134,11 @@ if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) {
   console.log(`✔ conta do painel do dono: ${staff.email}`);
 }
 
-// Conta demo (senha pública no README): SÓ com opt-in explícito e NUNCA em build da Vercel.
+// Conta demo (senha pública no README): SÓ com opt-in explícito, NUNCA em build da Vercel e só
+// num banco local (rodar o seed do seu computador contra produção não cria a conta demo lá).
 // Não dependa de NODE_ENV: no comando de build da Vercel ele pode não estar definido.
-if (process.env.SEED_DEMO !== "1" || process.env.VERCEL) {
+if (process.env.SEED_DEMO !== "1" || process.env.VERCEL || !bancoLocal()) {
+  if (process.env.SEED_DEMO === "1" && !bancoLocal()) console.warn("↷ conta demo NÃO criada: o banco não é local");
   await closeDb();
   process.exit(0);
 }
