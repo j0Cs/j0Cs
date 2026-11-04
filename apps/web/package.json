@@ -1,0 +1,32 @@
+{
+  "name": "@forja/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "echo \"(web) sem testes unitários\""
+  },
+  "dependencies": {
+    "@forja/core": "workspace:*",
+    "@forja/db": "workspace:*",
+    "@forja/ui": "workspace:*",
+    "lucide-react": "^1.68.0",
+    "next": "^16.4.5",
+    "pg": "^8.23.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.4",
+    "@types/node": "^22.19.0",
+    "@types/pg": "^8.15.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.2.0",
+    "tailwindcss": "^4.3.4",
+    "typescript": "5.9.3"
+  }
+}
