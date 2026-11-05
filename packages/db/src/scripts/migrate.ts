@@ -2,7 +2,7 @@ import { somenteEmProducao } from "./env";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
-import { portaDaUrl, semParametrosSsl, sslConfig } from "../client";
+import { portaDaUrl, semParametrosSsl, sslConfig, urlDeMigracao } from "../client";
 
 /**
  * Migrações usam conexão direta/sessão (DATABASE_URL_DIRECT, porta 5432 na Supabase):
@@ -10,16 +10,17 @@ import { portaDaUrl, semParametrosSsl, sslConfig } from "../client";
  */
 somenteEmProducao("migração");
 
-const connectionString = process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL;
-if (!connectionString) throw new Error("Defina DATABASE_URL_DIRECT ou DATABASE_URL.");
+const { url: connectionString, nome } = urlDeMigracao();
+if (!connectionString) throw new Error("Defina DATABASE_URL_DIRECT, DATABASE_URL ou conecte a integração Supabase (POSTGRES_URL).");
 // A trava abaixo é de sessão: no pooler em modo transação ela vaza entre conexões do servidor.
-if (portaDaUrl(connectionString, process.env.DATABASE_URL_DIRECT ? "DATABASE_URL_DIRECT" : "DATABASE_URL") === "6543") {
+if (portaDaUrl(connectionString, nome) === "6543") {
   throw new Error(
     "A migração não pode usar o pooler em modo transação (porta 6543). Defina DATABASE_URL_DIRECT " +
       "com a URL do pooler em modo sessão (porta 5432) da Supabase.",
   );
 }
-const pool = new pg.Pool({ connectionString: semParametrosSsl(connectionString), max: 1, ssl: sslConfig() });
+console.log(`↳ migrando por ${nome}`);
+const pool = new pg.Pool({ connectionString: semParametrosSsl(connectionString), max: 1, ssl: sslConfig(process.env, connectionString) });
 const client = await pool.connect();
 // Trava: os builds do app do cliente e do painel podem rodar ao mesmo tempo na Vercel.
 await client.query("select pg_advisory_lock(7212026)");

@@ -30,7 +30,15 @@ export async function precoMinutoBrlMicros(db: Db) {
 }
 
 /** Há chave da OpenAI ativa para a voz em nuvem? */
+/**
+ * A voz em nuvem só liga com VOZ_NUVEM_HABILITADA=1: ela depende da varredura a cada minuto
+ * (/api/cron/voz), que o plano Hobby da Vercel não permite (lá o cron roda 1 vez por dia).
+ * Ao passar para o Pro: cron "* * * * *" em apps/web/vercel.json + VOZ_NUVEM_HABILITADA=1.
+ */
+export const vozNuvemHabilitada = () => process.env.VOZ_NUVEM_HABILITADA === "1";
+
 export async function vozNuvemDisponivel(db: Db, orgId: string) {
+  if (!vozNuvemHabilitada()) return false;
   const keys = await createGatewayStore(db).listProviderKeys("openai", orgId);
   return keys.length > 0;
 }

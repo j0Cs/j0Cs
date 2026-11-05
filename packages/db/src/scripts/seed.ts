@@ -110,7 +110,7 @@ async function ensureUser(input: { email: string; name: string; password: string
 /** Banco no próprio computador (Docker do `pnpm db:up`)? Só nele a conta demo pode existir. */
 function bancoLocal(): boolean {
   try {
-    const host = new URL(process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL || "").hostname;
+    const host = new URL(process.env.DATABASE_URL_DIRECT || process.env.DATABASE_URL || process.env.POSTGRES_URL || "").hostname;
     return ["localhost", "127.0.0.1", "::1", "[::1]", "postgres"].includes(host);
   } catch {
     return false;

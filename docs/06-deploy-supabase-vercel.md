@@ -29,8 +29,22 @@ Endereços de produção: `forja-web-rampin-tech.vercel.app` e `forja-admin-ramp
 Os dois projetos estão com a **Vercel Authentication** ligada para tudo, menos domínios próprios. Enquanto não houver
 domínio, só membros do time Rampin abrem os endereços `.vercel.app`, o que serve como staging fechado.
 
-**Faltam os segredos.** Eles não passaram por esta conversa de propósito: você gera e cola direto na Vercel (veja o
-passo 3).
+## Publicação de teste no Hobby (05/11/2026)
+
+Decisão do dono: publicar já no plano **Hobby**, para testar antes do lançamento (o Hobby não permite uso comercial).
+
+- **Cron 1 vez por dia** (`17 6 * * *` em `apps/web/vercel.json`), porque o Hobby recusa o cron por minuto.
+- **Voz em nuvem desligada**: ela depende da varredura a cada minuto e só liga com `VOZ_NUVEM_HABILITADA=1`.
+  Chat, central, call com a voz do navegador e painel funcionam normalmente.
+- **Banco pela integração Supabase ↔ Vercel**: a integração cria `POSTGRES_URL` (pooler 6543) e companhia. O código usa
+  `POSTGRES_URL` quando não há `DATABASE_URL`, migra pelo mesmo pooler em modo sessão (porta 5432) e verifica o SSL com
+  o certificado raiz público da Supabase (`packages/db/src/supabase-ca.ts`). A senha do banco não passa por ninguém.
+- **Segredos gerados pelo Claude e cadastrados como Secret** (com autorização do dono; ficam no histórico da conversa).
+  Antes do lançamento, gere novos e substitua: trocar `ENCRYPTION_KEY` é de graça enquanto nenhuma chave de API
+  estiver cadastrada no painel; depois disso, as chaves precisam ser cadastradas de novo.
+
+**Ao passar para o Pro**: volte o cron para `* * * * *`, defina `VOZ_NUVEM_HABILITADA=1` no `forja-web` e faça um
+*Redeploy*.
 
 ## Arquitetura
 

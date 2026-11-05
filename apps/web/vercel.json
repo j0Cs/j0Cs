@@ -2,5 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["iad1"],
   "buildCommand": "pnpm --filter @forja/db migrate && next build",
-  "crons": [{ "path": "/api/cron/voz", "schedule": "* * * * *" }]
+  "crons": [{ "path": "/api/cron/voz", "schedule": "17 6 * * *" }]
 }

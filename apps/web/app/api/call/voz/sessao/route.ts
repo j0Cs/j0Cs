@@ -3,7 +3,7 @@ import { and, consumeRateLimit, createGatewayStore, eq, schema } from "@forja/db
 import { garantirProjeto } from "@/lib/projects";
 import { firstName } from "@/lib/persona";
 import { getApiSession } from "@/lib/session";
-import { instrucoesDaVoz, precoMinutoBrlMicros, VOZ_PRODUTO } from "@/lib/voz";
+import { instrucoesDaVoz, precoMinutoBrlMicros, VOZ_PRODUTO, vozNuvemHabilitada } from "@/lib/voz";
 
 export const runtime = "nodejs";
 
@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     return Response.json({ erro: "Saldo insuficiente para a voz em nuvem. Use a voz do navegador ou faça uma recarga." }, { status: 402 });
   }
 
+  if (!vozNuvemHabilitada()) return Response.json({ erro: "Voz em nuvem indisponível no momento. Use a voz do navegador." }, { status: 503 });
   const chaves = await createGatewayStore(db).listProviderKeys("openai", org.id);
   const chave = chaves[0];
   if (!chave) return Response.json({ erro: "Voz em nuvem indisponível no momento." }, { status: 503 });
