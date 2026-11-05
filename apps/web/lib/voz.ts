@@ -1,7 +1,7 @@
 import { computeChargeBrlMicros, VOICE_PRODUCTS, voiceCostUsdMicros, type VoiceProduct } from "@forja/core";
 import { decryptSecret, endLiveSession, type FimDaSessao } from "@forja/core/server";
-import { and, createGatewayStore, eq, getPricingSettings, inArray, schema, sql, type Db } from "@forja/db";
-import { ASSISTANT_NAME } from "./persona";
+import { and, consumeRateLimit, createGatewayStore, eq, getPricingSettings, inArray, lt, or, schema, sql, type Db } from "@forja/db";
+import { ASSISTANT_NAME, PERSONA_HEFESTO } from "./persona";
 
 export const VOZ_PRODUTO: VoiceProduct = VOICE_PRODUCTS["gpt-live-1"]!;
 /** O navegador manda um pulso a cada 15 s; sem pulso por 60 s a chamada é encerrada pela varredura. */
@@ -16,11 +16,17 @@ type Sessao = typeof schema.voiceSessions.$inferSelect;
 /** Instruções da voz (GPT-Live). O raciocínio de verdade é delegado ao nosso gateway. */
 export function instrucoesDaVoz(nome: string) {
   return `Você é ${ASSISTANT_NAME}, engenheiro-chefe da plataforma Forja, numa chamada de voz em português do Brasil com ${nome}.
-Comece cumprimentando ${nome} pelo nome e perguntando o que a pessoa quer construir.
-Fale de forma natural e calorosa, em frases curtas. Para qualquer pergunta técnica, decisão de produto,
-estimativa ou proposta, delegue ao backend e fale a resposta que ele devolver, com suas palavras e sem ler listas.
-Enquanto o backend pensa, mantenha a conversa viva com uma frase curta ("deixa eu pensar nisso um segundo").
-Nunca invente preços, prazos ou recursos da plataforma.`;
+
+${PERSONA_HEFESTO}
+
+Voz e ritmo: fale devagar e com calma, num tom grave, firme e acolhedor, como um homem maduro e experiente conversando
+de igual para igual. Faça pausas naturais entre as ideias. Nada de animação de locutor ou de atendente de telemarketing:
+é uma conversa entre duas pessoas.
+
+Comece cumprimentando ${nome} pelo nome, com calma, e perguntando o que vocês vão construir.
+Para qualquer pergunta técnica, decisão de produto, estimativa ou proposta, delegue ao backend e fale a resposta que ele
+devolver com as suas palavras, sem ler listas. Enquanto o backend pensa, mantenha a conversa viva com uma frase curta
+("deixa eu pensar nisso um instante"). Nunca invente preços, prazos ou recursos da plataforma.`;
 }
 
 /** Preço de tabela por minuto em micro-reais (para mostrar antes de entrar). */
@@ -31,9 +37,9 @@ export async function precoMinutoBrlMicros(db: Db) {
 
 /** Há chave da OpenAI ativa para a voz em nuvem? */
 /**
- * A voz em nuvem só liga com VOZ_NUVEM_HABILITADA=1: ela depende da varredura a cada minuto
- * (/api/cron/voz), que o plano Hobby da Vercel não permite (lá o cron roda 1 vez por dia).
- * Ao passar para o Pro: cron "* * * * *" em apps/web/vercel.json + VOZ_NUVEM_HABILITADA=1.
+ * A voz em nuvem só liga com VOZ_NUVEM_HABILITADA=1 (e uma chave da OpenAI no painel).
+ * No Hobby o cron roda 1 vez por dia; a varredura também roda a cada pulso e a cada abertura de
+ * call (varrerSeForAVez). No Pro, volte o cron de apps/web/vercel.json para "* * * * *".
  */
 export const vozNuvemHabilitada = () => process.env.VOZ_NUVEM_HABILITADA === "1";
 
@@ -156,3 +162,74 @@ export async function encerrarSessao(db: Db, sessao: Sessao, motivo: string, fim
     .where(eq(schema.voiceSessions.id, atual.id));
   return true;
 }
+
+/** Sem pulso: cobra no máximo até o último pulso + este tempo (30 s sem pulso + 1 min de folga). */
+const TETO_SEM_PULSO_SEGUNDOS = SEM_PULSO_SEGUNDOS + 60;
+/** Duração máxima de uma call (o pulso encerra ao passar daqui). */
+export const VOZ_MAX_MINUTOS = 60;
+
+/**
+ * Varredura das sessões de voz:
+ * - "active" sem pulso há 30 s: cobra até o último pulso + 90 s, no máximo, e desliga;
+ * - "connecting" parada há mais de 2 min: reserva órfã, libera;
+ * - "closing" (desligamento não confirmado): tenta de novo, sem cobrar nada além do ended_at.
+ * Abandonadas primeiro, retentativas depois; cada sessão isolada (uma falha não trava as outras).
+ */
+export async function varrerSessoes(db: Db, opcoes: { limite: number; orcamentoMs: number }) {
+  const agora = Date.now();
+  const pendentes = await db
+    .select()
+    .from(schema.voiceSessions)
+    .where(
+      or(
+        and(eq(schema.voiceSessions.status, "active"), lt(schema.voiceSessions.lastPulseAt, new Date(agora - SEM_PULSO_SEGUNDOS * 1000))),
+        eq(schema.voiceSessions.status, "closing"),
+        and(eq(schema.voiceSessions.status, "connecting"), lt(schema.voiceSessions.startedAt, new Date(agora - 120_000))),
+      ),
+    )
+    // abandonadas antes das retentativas: retentativas antigas não podem ocupar o lote inteiro
+    .orderBy(sql`case ${schema.voiceSessions.status} when 'active' then 0 when 'connecting' then 1 else 2 end`, schema.voiceSessions.lastPulseAt)
+    .limit(opcoes.limite);
+
+  let encerradas = 0;
+  let falhas = 0;
+  let adiadas = 0;
+  for (const s of pendentes) {
+    if (Date.now() - agora > opcoes.orcamentoMs) {
+      adiadas++;
+      continue;
+    }
+    try {
+      if (s.status === "connecting") {
+        await db.update(schema.voiceSessions).set({ status: "closed", endedAt: new Date(), endReason: "reserva-orfa" }).where(and(eq(schema.voiceSessions.id, s.id), inArray(schema.voiceSessions.status, ["connecting"])));
+        continue;
+      }
+      let ok: boolean;
+      if (s.status === "active") {
+        const ate = new Date(Math.min(Date.now(), s.lastPulseAt.getTime() + TETO_SEM_PULSO_SEGUNDOS * 1000));
+        await cobrarAte(db, s, ate);
+        ok = await encerrarSessao(db, s, "sem-pulso", ate);
+      } else {
+        await cobrarAte(db, s, new Date()); // limitado ao ended_at gravado quando o fim foi pedido
+        ok = await encerrarSessao(db, s, s.endReason ?? "retentativa");
+      }
+      if (ok) encerradas++;
+      else falhas++;
+    } catch (err) {
+      falhas++;
+      console.error(JSON.stringify({ level: "error", msg: "varredura de voz falhou", sessao: s.id, err: String(err) }));
+    }
+  }
+  return { verificadas: pendentes.length, encerradas, falhas, adiadas };
+}
+
+/**
+ * No Hobby da Vercel o cron roda 1 vez por dia, então cada pulso e cada abertura de call também
+ * disparam uma varredura curta, no máximo uma a cada 20 s no sistema todo. Com qualquer call
+ * ativa, uma call abandonada é encerrada em menos de um minuto.
+ */
+export async function varrerSeForAVez(db: Db) {
+  if (!(await consumeRateLimit(db, "voz-varredura", 1, 20))) return;
+  await varrerSessoes(db, { limite: 5, orcamentoMs: 10_000 });
+}
+

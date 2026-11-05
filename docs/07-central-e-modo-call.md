@@ -29,6 +29,18 @@ O nome do agente pode ser trocado com `NEXT_PUBLIC_ASSISTANT_NAME`.
 
 A voz natural só aparece quando há uma chave da OpenAI ativa em **Chaves de API** no painel do dono.
 
+## Personalidade e voz do Hefesto
+
+- **Jeito de falar** (`PERSONA_HEFESTO` em `apps/web/lib/persona.ts`, usado no chat da call e nas instruções do
+  GPT-Live): um mestre artesão experiente, calmo, firme e caloroso, sem pressa, com o humor seco de quem vive na
+  oficina. Fala português do dia a dia, reage ao que ouve e usa frases curtas. Não fala de deuses nem de mitologia; se
+  perguntarem, diz com naturalidade que é a inteligência artificial (o engenheiro) da Forja.
+- **Voz natural (GPT-Live)**: a pessoa escolhe entre as duas vozes em português, **Bossa** e **Tempo**; as instruções
+  pedem tom grave, ritmo calmo e pausas naturais. É a experiência parecida com o modo de voz do ChatGPT.
+- **Voz do navegador**: prefere vozes masculinas naturais (no Edge, "Microsoft Antonio Online (Natural)"), um pouco
+  mais grave e mais lenta, com seletor e botão "Ouvir" na sala de espera. No Chrome só existe a voz do Google (a mesma
+  do Google Tradutor); a sala avisa e sugere o Edge ou a voz natural.
+
 ## Segurança e cobrança da voz em nuvem
 
 ```
@@ -46,7 +58,8 @@ quem desliga é o servidor: o navegador só manda session.close pelo canal de da
 do REST só conta como "já encerrada" se o canal lateral nem chegou a abrir e a chave ainda é aceita pela
 OpenAI; se o canal abriu e não fechou, a sessão estava viva e a varredura tenta de novo.
 
-Vercel Cron (1/min, até 4 min por execução): /api/cron/voz
+Varredura (varrerSessoes): Vercel Cron (1/min no Pro; 1/dia no Hobby) e também a cada pulso e abertura de call
+(no máximo uma a cada 20 s). Cada call tem limite de 60 minutos.
     ├─ "active" sem pulso há 30 s     → cobra até o último pulso + 90 s, no máximo, e desliga
     ├─ "connecting" parada há 2 min   → reserva órfã, libera
     └─ "closing" (desligar falhou)    → tenta de novo; não cobra mais nada do cliente

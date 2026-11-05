@@ -55,7 +55,7 @@ export interface EventosNuvem {
 }
 
 export interface ChamadaNuvem {
-  iniciar(projeto: string): Promise<{ projectId: string; conversationId: string }>;
+  iniciar(projeto: string, voz?: "bossa" | "tempo"): Promise<{ projectId: string; conversationId: string }>;
   responder(delegacaoId: string, texto: string): void;
   silenciar(mudo: boolean): void;
   nivelUsuario(): number;
@@ -203,7 +203,7 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
   };
 
   return {
-    async iniciar(projeto) {
+    async iniciar(projeto, voz) {
       try {
         mic = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -280,7 +280,7 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
         const res = await fetch("/api/call/voz/sessao", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sdp: oferta.sdp, projeto, reserva: sessaoId }),
+          body: JSON.stringify({ sdp: oferta.sdp, projeto, reserva: sessaoId, voz }),
         });
         const dados = (await res.json().catch(() => ({}))) as {
           erro?: string;

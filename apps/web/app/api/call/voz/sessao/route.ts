@@ -3,7 +3,8 @@ import { and, consumeRateLimit, createGatewayStore, eq, schema } from "@forja/db
 import { garantirProjeto } from "@/lib/projects";
 import { firstName } from "@/lib/persona";
 import { getApiSession } from "@/lib/session";
-import { instrucoesDaVoz, precoMinutoBrlMicros, VOZ_PRODUTO, vozNuvemHabilitada } from "@/lib/voz";
+import { waitUntil } from "@vercel/functions";
+import { instrucoesDaVoz, precoMinutoBrlMicros, varrerSeForAVez, VOZ_PRODUTO, vozNuvemHabilitada } from "@/lib/voz";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
   if (org.status !== "active") return Response.json({ erro: "Sua conta está suspensa. Fale com o suporte." }, { status: 403 });
   if (!user.emailVerified) return Response.json({ erro: "Confirme seu e-mail para usar a voz." }, { status: 403 });
 
-  const body = (await request.json().catch(() => ({}))) as { sdp?: string; projeto?: string; reserva?: string };
+  const body = (await request.json().catch(() => ({}))) as { sdp?: string; projeto?: string; reserva?: string; voz?: string };
   if (!body.sdp?.startsWith("v=") || body.sdp.length > 20_000) return Response.json({ erro: "SDP inválido." }, { status: 400 });
   // id da reserva gerado pelo navegador: ele consegue encerrar a reserva (beacon ao fechar a aba)
   // antes mesmo de esta resposta chegar
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
   }
 
   if (!vozNuvemHabilitada()) return Response.json({ erro: "Voz em nuvem indisponível no momento. Use a voz do navegador." }, { status: 503 });
+  waitUntil(varrerSeForAVez(db).catch((err) => console.error(JSON.stringify({ level: "error", msg: "varredura na abertura falhou", err: String(err) }))));
   const chaves = await createGatewayStore(db).listProviderKeys("openai", org.id);
   const chave = chaves[0];
   if (!chave) return Response.json({ erro: "Voz em nuvem indisponível no momento." }, { status: 503 });
@@ -77,7 +79,8 @@ export async function POST(request: Request) {
       apiKey: chave.apiKey,
       sdpOffer: body.sdp,
       instructions: instrucoesDaVoz(firstName(user.name)),
-      voice: VOZ_PRODUTO.voice,
+      // as duas vozes em português do GPT-Live; qualquer outro valor cai no padrão
+      voice: body.voz === "tempo" || body.voz === "bossa" ? body.voz : VOZ_PRODUTO.voice,
       allowedClientEvents: EVENTOS_DO_CLIENTE,
     });
   } catch (err) {

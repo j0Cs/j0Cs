@@ -1,6 +1,7 @@
 import { and, eq, schema } from "@forja/db";
 import { getApiSession } from "@/lib/session";
-import { cobrarAte, encerrarSessao, precoMinutoBrlMicros } from "@/lib/voz";
+import { waitUntil } from "@vercel/functions";
+import { cobrarAte, encerrarSessao, precoMinutoBrlMicros, varrerSeForAVez, VOZ_MAX_MINUTOS } from "@/lib/voz";
 
 export const runtime = "nodejs";
 
@@ -9,6 +10,8 @@ export async function POST(request: Request) {
   const session = await getApiSession();
   if (!session) return Response.json({ erro: "Não autenticado." }, { status: 401 });
   const { db, org } = session;
+  // varredura curta das calls abandonadas de qualquer pessoa (no Hobby o cron é diário)
+  waitUntil(varrerSeForAVez(db).catch((err) => console.error(JSON.stringify({ level: "error", msg: "varredura no pulso falhou", err: String(err) }))));
   const { sessaoId } = (await request.json()) as { sessaoId?: string };
   if (!sessaoId) return Response.json({ erro: "sessaoId obrigatório." }, { status: 400 });
 
@@ -24,6 +27,10 @@ export async function POST(request: Request) {
   }
 
   const { cobrado, saldo } = await cobrarAte(db, sessao, new Date());
+  if (Date.now() - sessao.startedAt.getTime() > VOZ_MAX_MINUTOS * 60_000) {
+    await encerrarSessao(db, sessao, "duracao-maxima");
+    return Response.json({ encerrar: true, motivo: `A call chegou ao limite de ${VOZ_MAX_MINUTOS} minutos. Pode abrir outra para continuar.`, cobrado });
+  }
   const proximoMinuto = await precoMinutoBrlMicros(db);
   if (saldo !== null && saldo < proximoMinuto) {
     await encerrarSessao(db, sessao, "saldo");

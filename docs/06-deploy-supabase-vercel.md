@@ -34,8 +34,9 @@ domínio, só membros do time Rampin abrem os endereços `.vercel.app`, o que se
 Decisão do dono: publicar já no plano **Hobby**, para testar antes do lançamento (o Hobby não permite uso comercial).
 
 - **Cron 1 vez por dia** (`17 6 * * *` em `apps/web/vercel.json`), porque o Hobby recusa o cron por minuto.
-- **Voz em nuvem desligada**: ela depende da varredura a cada minuto e só liga com `VOZ_NUVEM_HABILITADA=1`.
-  Chat, central, call com a voz do navegador e painel funcionam normalmente.
+- **Voz em nuvem**: liga com `VOZ_NUVEM_HABILITADA=1` e uma chave da OpenAI no painel. Como o cron é diário, a
+  varredura das calls abandonadas também roda a cada pulso e a cada abertura de call (no máximo uma a cada 20 s), e
+  cada call tem limite de 60 minutos. Com o acesso restrito ao time, o risco de custo é baixo; no lançamento, Pro.
 - **Banco pela integração Supabase ↔ Vercel**: a integração cria `POSTGRES_URL` (pooler 6543) e companhia. O código usa
   `POSTGRES_URL` quando não há `DATABASE_URL`, migra pelo mesmo pooler em modo sessão (porta 5432) e verifica o SSL com
   o certificado raiz público da Supabase (`packages/db/src/supabase-ca.ts`). A senha do banco não passa por ninguém.
@@ -43,8 +44,7 @@ Decisão do dono: publicar já no plano **Hobby**, para testar antes do lançame
   Antes do lançamento, gere novos e substitua: trocar `ENCRYPTION_KEY` é de graça enquanto nenhuma chave de API
   estiver cadastrada no painel; depois disso, as chaves precisam ser cadastradas de novo.
 
-**Ao passar para o Pro**: volte o cron para `* * * * *`, defina `VOZ_NUVEM_HABILITADA=1` no `forja-web` e faça um
-*Redeploy*.
+**Ao passar para o Pro**: volte o cron para `* * * * *` em `apps/web/vercel.json` e faça um *Redeploy*.
 
 ## Arquitetura
 

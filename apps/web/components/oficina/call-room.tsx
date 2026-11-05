@@ -1,13 +1,13 @@
 "use client";
 
 import { criarDivisorDeFrases, formatBrlMicros } from "@forja/core";
-import { ArrowLeft, Hand, Mic, MicOff, PhoneOff, SendHorizontal } from "lucide-react";
+import { ArrowLeft, Hand, Mic, MicOff, PhoneOff, SendHorizontal, Volume2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { concluirCall, prepararCall } from "@/app/(oficina)/actions";
 import { EMPTY_SPEC, type CallSpec } from "@/lib/call";
 import { Nucleo, type NucleoModo } from "./nucleo";
-import { criarMotorNavegador, suporteDoNavegador, type MotorDeVoz } from "./voz";
+import { criarMotorNavegador, listarVozes, ouvirAmostra, suporteDoNavegador, type MotorDeVoz, type OpcaoDeVoz } from "./voz";
 import { criarChamadaNuvem, ErroDeVoz, type ChamadaNuvem } from "./voz-nuvem";
 
 type Fase = "sala" | "conectando" | "ativa" | "encerrada";
@@ -59,6 +59,11 @@ export function CallRoom(props: {
   const [suporte, setSuporte] = useState<ReturnType<typeof suporteDoNavegador> | null>(null);
   const [concluindo, iniciarConclusao] = useTransition();
   const [tipoVoz, setTipoVoz] = useState<"nuvem" | "navegador">(props.vozNuvem.disponivel ? "nuvem" : "navegador");
+  /** Vozes pt-BR deste navegador (a mais indicada primeiro) e a escolhida, lembrada entre visitas. */
+  const [vozesNavegador, setVozesNavegador] = useState<OpcaoDeVoz[]>([]);
+  const [vozNavegador, setVozNavegador] = useState("");
+  /** Voz natural em nuvem: as duas vozes em português do GPT-Live. */
+  const [vozNuvemNome, setVozNuvemNome] = useState<"bossa" | "tempo">("bossa");
 
   const motor = useRef<MotorDeVoz | null>(null);
   const nuvem = useRef<ChamadaNuvem | null>(null);
@@ -79,6 +84,29 @@ export function CallRoom(props: {
   const transcricaoCaixa = useRef<HTMLDivElement>(null);
 
   useEffect(() => setSuporte(suporteDoNavegador()), []);
+  useEffect(() => {
+    try {
+      const salva = localStorage.getItem("forja_voz_navegador");
+      if (salva) setVozNavegador(salva);
+      const nuvem = localStorage.getItem("forja_voz_nuvem");
+      if (nuvem === "bossa" || nuvem === "tempo") setVozNuvemNome(nuvem);
+    } catch {
+      // sem armazenamento: usa a mais indicada
+    }
+    const carregar = () => setVozesNavegador(listarVozes());
+    carregar();
+    // algumas vozes (as naturais do Edge) só aparecem depois deste evento
+    window.speechSynthesis?.addEventListener?.("voiceschanged", carregar);
+    return () => window.speechSynthesis?.removeEventListener?.("voiceschanged", carregar);
+  }, []);
+  const lembrar = (chave: string, valor: string) => {
+    try {
+      localStorage.setItem(chave, valor);
+    } catch {
+      // sem armazenamento: vale só nesta visita
+    }
+  };
+  const amostra = `Oi, ${props.nome}. Que bom ter você aqui. Eu sou o ${props.agente}. Me conta, com calma: o que a gente vai construir?`;
   useEffect(() => {
     if (fase !== "ativa") return;
     const id = setInterval(() => setAgora(Date.now()), 1000);
@@ -302,7 +330,7 @@ export function CallRoom(props: {
     });
     nuvemConectando.current = c;
     try {
-      const r = await c.iniciar(props.projeto?.id ?? "nova");
+      const r = await c.iniciar(props.projeto?.id ?? "nova", vozNuvemNome);
       nuvemConectando.current = null;
       if (!montado.current) {
         void c.encerrar();
@@ -329,7 +357,7 @@ export function CallRoom(props: {
     setErro(null);
     setFase("conectando");
     if (tipoVoz === "nuvem") return entrarNaNuvem();
-    const m = criarMotorNavegador();
+    const m = criarMotorNavegador({ voz: vozNavegador || undefined });
     motor.current = m;
     try {
       await m.iniciar({
@@ -364,7 +392,7 @@ export function CallRoom(props: {
     setAgora(Date.now());
     setFase("ativa");
     setModo("ouvindo");
-    const saudacao = `Oi, ${props.nome}! Eu sou o ${props.agente}. Me conta: o que você quer construir?`;
+    const saudacao = amostra;
     setLinhas([{ id: crypto.randomUUID(), quem: "agente", texto: saudacao }]);
     m.falar(saudacao);
   }
@@ -477,6 +505,74 @@ export function CallRoom(props: {
             </label>
           ))}
         </fieldset>
+
+        {tipoVoz === "navegador" && vozesNavegador.length > 0 ? (
+          <div className="w-full rounded-lg border border-aco-700 bg-aco-900/60 p-3 text-left">
+            <label className="block font-mono text-[11px] uppercase tracking-[0.14em] text-aco-400" htmlFor="voz-navegador">
+              Voz do {props.agente}
+            </label>
+            <div className="mt-1.5 flex gap-2">
+              <select
+                id="voz-navegador"
+                value={vozNavegador || vozesNavegador[0]!.nome}
+                disabled={fase === "conectando"}
+                onChange={(e) => {
+                  setVozNavegador(e.target.value);
+                  lembrar("forja_voz_navegador", e.target.value);
+                }}
+                className="min-w-0 flex-1 rounded-md border border-aco-700 bg-aco-950/60 px-2 py-1.5 text-sm text-aco-100 focus:border-revenido focus:outline-none"
+              >
+                {vozesNavegador.map((v) => (
+                  <option key={v.nome} value={v.nome} className="bg-aco-900">
+                    {v.nome}
+                    {v.natural ? " · natural" : ""}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => ouvirAmostra(amostra, vozNavegador || undefined)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-aco-700 px-3 text-sm text-aco-100 hover:border-aco-500"
+              >
+                <Volume2 size={15} /> Ouvir
+              </button>
+            </div>
+            {!vozesNavegador.some((v) => v.natural && v.masculina) ? (
+              <p className="mt-2 text-xs text-aco-400">
+                Este navegador não tem uma voz masculina natural. No Microsoft Edge há a voz &quot;Antonio (Natural)&quot;, bem
+                mais próxima de uma conversa de verdade; a voz natural em nuvem é a melhor de todas.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        {tipoVoz === "nuvem" && props.vozNuvem.disponivel ? (
+          <fieldset className="w-full rounded-lg border border-aco-700 bg-aco-900/60 p-3 text-left">
+            <legend className="px-1 font-mono text-[11px] uppercase tracking-[0.14em] text-aco-400">Voz do {props.agente}</legend>
+            <div className="flex gap-2">
+              {(["bossa", "tempo"] as const).map((v) => (
+                <label
+                  key={v}
+                  className={`flex-1 cursor-pointer rounded-md border px-3 py-1.5 text-center text-sm capitalize ${vozNuvemNome === v ? "border-brasa bg-brasa/10 text-aco-100" : "border-aco-700 text-aco-300"}`}
+                >
+                  <input
+                    type="radio"
+                    name="vozNuvem"
+                    value={v}
+                    checked={vozNuvemNome === v}
+                    disabled={fase === "conectando"}
+                    onChange={() => {
+                      setVozNuvemNome(v);
+                      lembrar("forja_voz_nuvem", v);
+                    }}
+                    className="sr-only"
+                  />
+                  {v}
+                </label>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-aco-400">As duas vozes em português da OpenAI. Você ouve a escolhida já no cumprimento.</p>
+          </fieldset>
+        ) : null}
 
         {bloqueado ? (
           <p className="w-full rounded-md border border-brasa/40 bg-brasa/10 px-3 py-2 text-sm text-brasa-claro">

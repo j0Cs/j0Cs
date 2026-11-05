@@ -108,17 +108,65 @@ const sintese = (): SpeechSynthesis | undefined => (typeof window !== "undefined
 const ERROS_PERSISTENTES = new Set(["network", "audio-capture", "language-not-supported"]);
 const MAX_FALHAS_RECONHECIMENTO = 5;
 
-function escolherVoz(): SpeechSynthesisVoice | null {
-  const vozes = (sintese()?.getVoices() ?? []).filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("pt-br"));
-  const preferidas = ["Google", "Francisca", "Thalita", "Antonio", "Luciana", "Microsoft"];
-  for (const p of preferidas) {
-    const v = vozes.find((x) => x.name.includes(p));
-    if (v) return v;
-  }
-  return vozes[0] ?? null;
+/** Nomes de vozes masculinas em pt-BR (Microsoft no Edge/Windows, Apple no macOS/iOS). */
+const MASCULINAS = /antonio|donato|fabio|humberto|julio|nicolau|valerio|felipe|daniel|ricardo/i;
+/** Vozes neurais: soam como gente (no Edge: "Microsoft Antonio Online (Natural)"). */
+const NATURAIS = /natural|neural|premium|enhanced|aprimorad/i;
+
+export interface OpcaoDeVoz {
+  nome: string;
+  natural: boolean;
+  masculina: boolean;
 }
 
-export function criarMotorNavegador(): MotorDeVoz {
+const vozesPtBr = () =>
+  (sintese()?.getVoices() ?? []).filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith("pt-br"));
+
+/** Ordem de preferência para o Hefesto: masculina natural > masculina > natural > qualquer outra. */
+function pontuar(v: SpeechSynthesisVoice) {
+  return (MASCULINAS.test(v.name) ? 2 : 0) + (NATURAIS.test(v.name) ? 3 : 0) + (v.localService ? 0 : 0.5);
+}
+
+/** Vozes pt-BR disponíveis neste navegador, da mais indicada para a menos. */
+export function listarVozes(): OpcaoDeVoz[] {
+  return [...vozesPtBr()]
+    .sort((a, b) => pontuar(b) - pontuar(a))
+    .map((v) => ({ nome: v.name, natural: NATURAIS.test(v.name), masculina: MASCULINAS.test(v.name) }));
+}
+
+function escolherVoz(preferida?: string): SpeechSynthesisVoice | null {
+  const vozes = vozesPtBr();
+  if (preferida) {
+    const v = vozes.find((x) => x.name === preferida);
+    if (v) return v;
+  }
+  return [...vozes].sort((a, b) => pontuar(b) - pontuar(a))[0] ?? null;
+}
+
+/**
+ * Timbre do Hefesto: um homem maduro, sem pressa. Numa voz masculina, só um pouco mais grave;
+ * numa voz feminina (a única no Chrome), o tom não muda, para não soar artificial.
+ */
+function timbre(voz: SpeechSynthesisVoice | null) {
+  const masculina = voz ? MASCULINAS.test(voz.name) : false;
+  return { pitch: masculina ? 0.88 : 1, rate: 0.95 };
+}
+
+/** Fala uma frase de amostra (botão "ouvir" na sala de espera). */
+export function ouvirAmostra(texto: string, preferida?: string) {
+  const s = sintese();
+  if (!s) return false;
+  s.cancel();
+  const u = new SpeechSynthesisUtterance(texto);
+  u.lang = "pt-BR";
+  const voz = escolherVoz(preferida);
+  if (voz) u.voice = voz;
+  Object.assign(u, timbre(voz));
+  s.speak(u);
+  return true;
+}
+
+export function criarMotorNavegador(opcoes: { voz?: string } = {}): MotorDeVoz {
   const Rec = construtorReconhecedor();
   let eventos: EventosDeVoz | null = null;
   let rec: Reconhecedor | null = null;
@@ -193,9 +241,9 @@ export function criarMotorNavegador(): MotorDeVoz {
     pararDeOuvir();
     const u = new SpeechSynthesisUtterance(frase);
     u.lang = "pt-BR";
-    const voz = escolherVoz();
+    const voz = escolherVoz(opcoes.voz);
     if (voz) u.voice = voz;
-    u.rate = 1.04;
+    Object.assign(u, timbre(voz));
     u.onstart = () => eventos?.onFrase(frase);
     u.onboundary = () => {
       nivelFala = 0.85;
