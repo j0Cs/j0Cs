@@ -8,8 +8,17 @@ import { githubAction, magicLinkAction, signInAction } from "../actions";
 
 export const metadata = { title: "Entrar" };
 
-export default async function SignInPage({ searchParams }: { searchParams: Promise<{ convite?: string; senha?: string; next?: string }> }) {
-  const { convite, senha, next } = await searchParams;
+const primeiro = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ convite?: string | string[]; senha?: string | string[]; next?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const convite = primeiro(params.convite);
+  const senha = primeiro(params.senha);
+  const next = primeiro(params.next);
   // o "voltar para" vem da URL: só caminhos deste site (vale também para quem já está logado)
   const after = caminhoInterno(convite ? `/convite/${encodeURIComponent(convite)}` : next);
   if (await getAuthUser()) redirect(after);

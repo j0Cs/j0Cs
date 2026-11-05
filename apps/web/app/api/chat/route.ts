@@ -89,8 +89,9 @@ export async function POST(request: Request) {
     .orderBy(asc(schema.messages.createdAt));
   const history: ChatMessage[] = rows.slice(-HISTORY_LIMIT).filter((m) => m.content.trim());
   while (history[0]?.role === "assistant") history.shift();
-  // só responde se a última fala for do usuário (evita respostas duplicadas)
-  if (body.responderUltima && history.at(-1)?.role !== "user") {
+  // só responde se a última fala for do usuário (evita respostas duplicadas); uma resposta ainda
+  // em geração (linha vazia) conta como resposta
+  if (body.responderUltima && rows.at(-1)?.role !== "user") {
     return new Response("Nada a responder.", { status: 409 });
   }
 
@@ -108,6 +109,12 @@ export async function POST(request: Request) {
    * viva depois que o cliente sai.
    */
   const projectId = project.id;
+  // A linha da resposta nasce agora (vazia, fora do histórico) e é preenchida no fim: se a pessoa
+  // mandar outra mensagem antes de esta resposta terminar, a ordem continua pergunta → resposta.
+  const [linhaResposta] = await db
+    .insert(schema.messages)
+    .values({ conversationId: conv.id, role: "assistant", content: "" })
+    .returning({ id: schema.messages.id });
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       waitUntil(gerar(controller));
@@ -141,13 +148,14 @@ export async function POST(request: Request) {
         )) {
           if (event.type === "text") answer += event.text;
           if (event.type === "done") {
-            await db.insert(schema.messages).values({
-              conversationId: conv.id,
-              role: "assistant",
-              content: answer || (event.refused ? "O modelo recusou esta solicitação." : ""),
-              modelId: event.servedModel,
-              usageEventId: event.usageEventId ?? null,
-            });
+            await db
+              .update(schema.messages)
+              .set({
+                content: answer || (event.refused ? "O modelo recusou esta solicitação." : ""),
+                modelId: event.servedModel,
+                usageEventId: event.usageEventId ?? null,
+              })
+              .where(eq(schema.messages.id, linhaResposta!.id));
             await db
               .update(schema.conversations)
               .set({ updatedAt: new Date(), modelId: body.modelId! })
@@ -159,6 +167,11 @@ export async function POST(request: Request) {
         console.error("[chat]", err);
         send({ type: "error", code: "internal", message: "Erro interno. Tente novamente." });
       } finally {
+        // sem resposta gravada (erro, recusa vazia): não deixa uma linha vazia na conversa
+        await db
+          .delete(schema.messages)
+          .where(and(eq(schema.messages.id, linhaResposta!.id), eq(schema.messages.content, "")))
+          .catch(() => undefined);
         try {
           controller.close();
         } catch {

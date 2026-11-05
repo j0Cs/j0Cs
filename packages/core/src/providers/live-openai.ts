@@ -130,13 +130,23 @@ export async function hangupLiveSession(input: { apiKey: string; sessionId: stri
   }
 }
 
-/** A chave ainda é aceita pela OpenAI? (desempata um 404 ambíguo). null = não deu para saber. */
+/**
+ * A chave ainda é aceita pela OpenAI? (desempata um 404 ambíguo). null = não deu para saber.
+ * Só conta como recusada quando a OpenAI diz que a chave é inválida: uma chave restrita sem
+ * permissão de listar modelos também recebe 401/403 ("Missing scopes"), e isso não é chave caída.
+ */
 async function chaveAceita(apiKey: string, fetchImpl?: typeof fetch): Promise<boolean | null> {
   const f = fetchImpl ?? fetch;
   try {
     const res = await f(`${raiz()}/models`, { headers: { authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(PRAZO_REST_MS) });
-    if (res.status === 401 || res.status === 403) return false;
-    return res.ok ? true : null;
+    if (res.ok) return true;
+    if (res.status === 401 || res.status === 403) {
+      const corpo = (await res.json().catch(() => ({}))) as { error?: { code?: string | null; message?: string } };
+      const invalida =
+        corpo.error?.code === "invalid_api_key" || /incorrect api key|invalid api key|revoked|deactivated/i.test(corpo.error?.message ?? "");
+      return invalida ? false : null;
+    }
+    return null;
   } catch {
     return null;
   }

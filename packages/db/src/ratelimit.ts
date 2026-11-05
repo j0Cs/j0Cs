@@ -22,3 +22,8 @@ export async function rateLimitCount(db: Db, key: string, windowSeconds: number)
     where key = ${key} and window_start >= now() - make_interval(secs => ${windowSeconds})`);
   return Number(rows[0]?.count ?? 0);
 }
+
+/** Devolve uma unidade consumida (ex.: login que deu certo depois de reservar a tentativa). */
+export async function refundRateLimit(db: Db, key: string): Promise<void> {
+  await db.execute(sql`update rate_limits set count = greatest(count - 1, 0) where key = ${key}`);
+}

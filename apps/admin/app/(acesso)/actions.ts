@@ -1,7 +1,7 @@
 "use server";
 
-import { authErrorMessage, getAdminAuth } from "@forja/auth";
-import { consumeRateLimit, getDb } from "@forja/db";
+import { authErrorMessage, getAdminAuth, hashPassword } from "@forja/auth";
+import { consumeRateLimit, eq, getDb, schema } from "@forja/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import QRCode from "qrcode";
@@ -44,8 +44,16 @@ export async function signInAction(_: State, f: FormData): Promise<State> {
   let next = "/";
   const ip = await ipDoCliente();
   const email = str(f, "email").toLowerCase();
-  if (!(await dentroDoLimite([[`admin:login:ip:${ip}`, 20, 900], [`admin:login:par:${email}:${ip}`, 8, 900]]))) {
+  if (!(await dentroDoLimite([[`admin:login:ip:${ip}`, 20, 900], [`admin:login:par:${email}|${ip}`, 8, 900]]))) {
     return { error: MUITAS_TENTATIVAS };
+  }
+  // Só contas staff chegam a ter a senha conferida: para qualquer outro e-mail o painel nem cria
+  // sessão (nada de cookie diferente que revele se a senha de um cliente está certa). O hash
+  // descartável iguala o tempo de resposta.
+  const conta = await getDb().query.users.findFirst({ where: eq(schema.users.email, email), columns: { platformRole: true } });
+  if (conta?.platformRole !== "staff") {
+    await hashPassword(String(f.get("password") ?? "x"));
+    return { error: CREDENCIAIS_INVALIDAS };
   }
   try {
     const res = await getAdminAuth().api.signInEmail({

@@ -26,6 +26,12 @@ describe("caminhoInterno (voltar para)", () => {
     expect(caminhoInterno(v)).toBe("/central");
   });
 
+  it("parâmetro repetido (?next=a&next=b) não derruba a página", () => {
+    expect(caminhoInterno(["/projetos", "//evil.com"])).toBe("/projetos");
+    expect(caminhoInterno(["//evil.com"])).toBe("/central");
+    expect(caminhoInterno({ x: 1 })).toBe("/central");
+  });
+
   it("usa o padrão quando não há valor", () => {
     expect(caminhoInterno(undefined)).toBe("/central");
     expect(caminhoInterno(null, "/x")).toBe("/x");

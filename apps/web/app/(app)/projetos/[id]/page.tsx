@@ -43,7 +43,9 @@ export default async function ProjectPage({
         .where(eq(schema.messages.conversationId, active.id))
         .orderBy(asc(schema.messages.createdAt))
     : [];
-  const history = rows.map(({ message, usage }) => ({
+  // linha vazia = resposta ainda em geração: fora da tela, mas conta como "já respondendo"
+  // (recarregar com ?responder=1 não duplica a resposta)
+  const history = rows.filter(({ message }) => message.content.trim()).map(({ message, usage }) => ({
     id: message.id,
     role: message.role,
     content: message.content,
@@ -100,7 +102,7 @@ export default async function ProjectPage({
           initialMessages={history}
           models={models}
           defaultModelId={active?.modelId ?? project.defaultModelId ?? defaultModelFor(models)}
-          responderPendente={Boolean(responder && active && history.at(-1)?.role === "user")}
+          responderPendente={Boolean(responder && active && rows.at(-1)?.message.role === "user")}
         />
       </div>
     </div>

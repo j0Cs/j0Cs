@@ -7,8 +7,10 @@ const BASE = "http://interno.invalid";
  * controle, que navegadores tratam como separador de host) E a saída já normalizada: o
  * parser de URL resolve "/./" e "/../", e "/.//evil.com" vira "//evil.com" (outro host).
  */
-export function caminhoInterno(v: string | null | undefined, padrao = "/central"): string {
-  if (!v || !v.startsWith("/") || /[\\\s\x00-\x1f\x7f]/.test(v)) return padrao;
+export function caminhoInterno(v: unknown, padrao = "/central"): string {
+  // ?next=a&next=b chega como lista: pega o primeiro (e qualquer coisa que não seja texto cai no padrão)
+  if (Array.isArray(v)) v = v[0];
+  if (typeof v !== "string" || !v.startsWith("/") || /[\\\s\x00-\x1f\x7f]/.test(v)) return padrao;
   try {
     const u = new URL(v, BASE);
     const saida = u.pathname + u.search + u.hash;

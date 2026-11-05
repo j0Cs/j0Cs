@@ -20,7 +20,8 @@ export async function POST(request: Request) {
   if (!sessao) {
     // O navegador desistiu antes de /sessao gravar a reserva (aba fechada logo no clique): deixa uma
     // marca "closed" com esse id, e a criação que ainda estiver a caminho falha na chave primária.
-    if (falhou === true && sessaoId && UUID.test(sessaoId)) {
+    // limitada por pessoa: sem isso, um script encheria a tabela com marcas
+    if (falhou === true && sessaoId && UUID.test(sessaoId) && (await consumeRateLimit(db, `voz-marca:${user.id}`, 30, 3600))) {
       await db
         .insert(schema.voiceSessions)
         .values({ id: sessaoId, orgId: org.id, userId: user.id, providerId: "openai", providerSessionId: "pendente", model: VOZ_PRODUTO.id, status: "closed", endedAt: new Date(), endReason: "cancelada-antes" })

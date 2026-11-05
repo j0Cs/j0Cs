@@ -31,6 +31,7 @@ export async function POST(request: Request) {
     .where(eq(schema.messages.conversationId, conversa.id))
     .orderBy(asc(schema.messages.createdAt));
   const transcricao = msgs
+    .filter((m) => m.content.trim()) // resposta ainda em geração não entra
     .slice(-40)
     .map((m) => `${m.role === "user" ? "Cliente" : "Engenheiro"}: ${m.content.slice(0, 2_000)}`)
     .join("\n");

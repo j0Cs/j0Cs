@@ -41,7 +41,8 @@ navegador ──SDP──► /api/call/voz/sessao ──(nossa chave)──► O
     └─ fim: /api/call/voz/fim            → cobra até agora e desliga
 
 Desligar = servidor conecta no canal lateral wss://…/live/sessions/{id}/attach, envia session.close e espera
-session.closed (com os segundos que a OpenAI cobrou); se não vier, tenta o endpoint REST de hangup. Um 404
+session.closed (com os segundos que a OpenAI cobrou); se não vier, tenta o endpoint REST de hangup. No fim normal
+quem desliga é o servidor: o navegador só manda session.close pelo canal de dados se /fim falhar. Um 404
 do REST só conta como "já encerrada" se o canal lateral nem chegou a abrir e a chave ainda é aceita pela
 OpenAI; se o canal abriu e não fechou, a sessão estava viva e a varredura tenta de novo.
 
@@ -61,13 +62,14 @@ Vercel Cron (1/min, até 4 min por execução): /api/cron/voz
   usuário, quando: passaram 10 minutos tentando, a chave que abriu a call foi apagada, ou a OpenAI recusou a chave.
   Por isso o painel não deixa apagar uma chave com call em andamento: desative e apague depois.
 - **Conexão**: o navegador gera o id da reserva e manda junto no pedido. Sair da sala ou fechar a aba durante
-  "Conectando…" fecha a sessão sem cobrar, mesmo antes de o servidor responder. A call só começa a ser cobrada quando
-  o WebRTC chega a "connected" (até 15 s; redes que bloqueiam UDP caem em erro, sem cobrança). Quedas curtas de rede
-  (até 10 s) não derrubam a call.
+  "Conectando…" fecha a sessão sem cobrar, mesmo antes de o servidor responder. Se o WebRTC não chegar a "connected"
+  em 15 s (redes que bloqueiam UDP), a call cai em erro, sem cobrança. Depois de conectada, a cobrança conta desde a
+  criação da sessão no provedor (inclui os poucos segundos de conexão), com o primeiro pulso enviado na hora.
+  Quedas curtas de rede (até 10 s) não derrubam a call.
 - **Isenção por falha de conexão**: o aviso vem do navegador, então vale no máximo 3 vezes por hora por pessoa; depois
   disso a call é cobrada normalmente. Abrir call também tem limite (20 por hora por pessoa).
 - **Interrupções**: falar por cima do Hefesto (ou parar uma resposta no chat) não cancela o modelo. A resposta termina
-  no servidor, fica salva na conversa e é cobrada pelo uso real do provedor. Cancelar no meio exigiria estimar tokens
+  no servidor, fica salva na conversa (na ordem certa, logo depois da pergunta) e é cobrada pelo uso real do provedor. Cancelar no meio exigiria estimar tokens
   de raciocínio e de cache, que não aparecem no texto, e cobraria abaixo do custo.
 - `CRON_SECRET` precisa estar definido no projeto `forja-web` da Vercel (a Vercel o envia na varredura). O cron só roda
   em deploys de **produção**; em prévias de PR, a proteção fica por conta do pulso e do desligamento por queda de conexão.

@@ -118,18 +118,25 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
     if (canal?.readyState === "open") canal.send(JSON.stringify(obj));
   };
 
-  const avisarFim = (falhou: boolean) =>
-    fetch("/api/call/voz/fim", {
+  /** /fim já foi pedido para esta reserva (não repete). */
+  let fimEnviado = false;
+  // keepalive: o pedido sobrevive mesmo se a aba for fechada logo em seguida
+  const avisarFim = (falhou: boolean) => {
+    fimEnviado = true;
+    return fetch("/api/call/voz/fim", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ sessaoId, falhou }),
+      keepalive: true,
     });
+  };
 
   // aba fechada ou recarregada: avisa o servidor na hora (cobrança justa e desligamento imediato).
   // Vale desde o pedido da reserva: fechar a aba durante "Conectando…" também fecha a sessão.
   const aoSair = () => {
-    if (encerrada || !reservaEnviada) return;
+    if (encerrada || !reservaEnviada || fimEnviado) return;
     encerrada = true;
+    fimEnviado = true;
     navigator.sendBeacon("/api/call/voz/fim", new Blob([JSON.stringify({ sessaoId, falhou: !conectada })], { type: "application/json" }));
   };
 
@@ -166,12 +173,22 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
     if (pulso) clearInterval(pulso);
     // o microfone para na hora; a conexão fica aberta até o servidor confirmar o fim
     mic?.getTracks().forEach((t) => t.stop());
-    enviar({ type: EVENTOS.fechar });
+    if (reservaEnviada && !conectada && !fimEnviado) {
+      // saiu durante "Conectando…": avisa já (sem esperar /sessao responder), com keepalive, para a
+      // aba poder ser fechada em seguida sem deixar a sessão órfã
+      void avisarFim(true).catch(() => undefined);
+    }
     if (sessaoId && conectada) {
-      await avisarFim(false)
+      // Quem desliga é o servidor (canal lateral): assim ele recebe o session.closed com os segundos
+      // que a OpenAI cobrou. O session.close pelo canal de dados é só o plano B, se /fim falhar.
+      const ok = await avisarFim(false)
         .then((r) => r.json())
-        .then((d: { cobrado?: number }) => d.cobrado && ev.onCobranca(d.cobrado))
-        .catch(() => undefined);
+        .then((d: { ok?: boolean; cobrado?: number }) => {
+          if (d.cobrado) ev.onCobranca(d.cobrado);
+          return d.ok === true;
+        })
+        .catch(() => false);
+      if (!ok) enviar({ type: EVENTOS.fechar });
     }
     liberar();
     // encerrar() durante a conexão: quem chamou iniciar() recebe o cancelamento por lá
@@ -181,7 +198,7 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
   /** Saiu no meio da conexão: solta tudo e, se a reserva já foi pedida, fecha sem cobrar. */
   const cancelar = async (): Promise<never> => {
     liberar();
-    if (reservaEnviada) await avisarFim(true).catch(() => undefined);
+    if (reservaEnviada && !fimEnviado) await avisarFim(true).catch(() => undefined);
     throw new ErroDeVoz("Chamada cancelada.", true);
   };
 
@@ -311,7 +328,7 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
         }
         conectada = true;
 
-        pulso = setInterval(async () => {
+        const pulsar = async () => {
           try {
             const r = await fetch("/api/call/voz/pulso", {
               method: "POST",
@@ -324,7 +341,11 @@ export function criarChamadaNuvem(ev: EventosNuvem): ChamadaNuvem {
           } catch {
             // um pulso perdido não derruba a chamada; a varredura do servidor cobre a ausência
           }
-        }, 15_000);
+        };
+        // primeiro pulso já ao conectar: a espera pela conexão não pode encostar nos 30 s sem pulso
+        // em que a varredura do servidor encerra a call
+        void pulsar();
+        pulso = setInterval(pulsar, 15_000);
 
         return { projectId: dados.projectId!, conversationId: dados.conversationId! };
       } catch (err) {

@@ -54,8 +54,12 @@ describe("GPT-Live", () => {
   }
 
   /** fetch falso que responde por rota: hangup e /models (checagem da chave). */
-  const rotas = (hangup: number, models: number) =>
-    vi.fn(async (url: string) => new Response(null, { status: String(url).endsWith("/models") ? models : hangup }));
+  const rotas = (hangup: number, models: number, corpoModels: unknown = null) =>
+    vi.fn(async (url: string) =>
+      String(url).endsWith("/models")
+        ? new Response(corpoModels ? JSON.stringify(corpoModels) : null, { status: models })
+        : new Response(null, { status: hangup }),
+    );
   const urls = (f: ReturnType<typeof rotas>) => f.mock.calls.map((c) => String((c as unknown as [string])[0]));
 
   it("encerra pelo canal lateral com session.close e lê o uso final", async () => {
@@ -99,8 +103,14 @@ describe("GPT-Live", () => {
     expect(urls(f)).toEqual(["https://api.openai.com/v1/live/sessions/live_1/hangup", "https://api.openai.com/v1/models"]);
   });
 
+  it("chave restrita sem permissão de listar modelos não é dada como caída (fica para nova tentativa)", async () => {
+    const f = rotas(404, 401, { error: { code: null, message: "You have insufficient permissions for this operation. Missing scopes: api.model.read." } });
+    const r = await endLiveSession({ apiKey: "sk", sessionId: "live_1", WebSocketImpl: fakeWs("recusa").Impl, fetchImpl: f as unknown as typeof fetch });
+    expect(r).toEqual({ ok: false, status: 404 });
+  });
+
   it("canal lateral recusado e REST 404 com a chave recusada: avisa que a chave caiu", async () => {
-    const f = rotas(404, 401);
+    const f = rotas(404, 401, { error: { code: "invalid_api_key", message: "Incorrect API key provided: sk-…" } });
     const r = await endLiveSession({ apiKey: "sk", sessionId: "live_1", WebSocketImpl: fakeWs("recusa").Impl, fetchImpl: f as unknown as typeof fetch });
     expect(r).toEqual({ ok: false, status: 404, chaveRecusada: true });
   });

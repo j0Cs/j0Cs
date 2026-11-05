@@ -1,7 +1,7 @@
 "use server";
 
 import { authErrorMessage, caminhoInterno, getWebAuth } from "@forja/auth";
-import { acceptInvitation, consumeRateLimit, createOrganizationForUser, getDb, OrgError, rateLimitCount } from "@forja/db";
+import { acceptInvitation, consumeRateLimit, createOrganizationForUser, getDb, OrgError, refundRateLimit } from "@forja/db";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { FormState } from "@/components/action-form";
@@ -33,11 +33,16 @@ const MUITAS = { error: "Muitas tentativas. Aguarde alguns minutos e tente de no
 /**
  * Login: o limite por conta conta só FALHAS, por par (e-mail, IP) e com um teto global maior
  * por e-mail. Assim um atacante de um IP não trava a conta de outra pessoa, e adivinhar senha
- * a partir de muitos IPs continua limitado.
+ * a partir de muitos IPs continua limitado. A tentativa é RESERVADA antes (UPSERT atômico, nada
+ * de "conferir e depois somar", que rajadas simultâneas furam) e devolvida quando dá certo.
+ * Chaves com prefixos distintos ("par:"/"conta:") e separador "|": um e-mail terminado em ":<ip>"
+ * não cai no balde de outra pessoa.
  */
 const FALHAS_POR_PAR = 8;
 const FALHAS_POR_EMAIL = 50;
 const JANELA_LOGIN = 900;
+/** Formato mínimo de e-mail: antes de qualquer limite (e-mail inválido não ocupa balde de ninguém). */
+const EMAIL_VALIDO = /^[^\s@:|]+@[^\s@:|]+\.[^\s@:|]+$/;
 
 async function setActiveOrg(orgId: string) {
   (await cookies()).set(ACTIVE_ORG_COOKIE, orgId, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
@@ -46,22 +51,26 @@ async function setActiveOrg(orgId: string) {
 export async function signInAction(_: FormState, f: FormData): Promise<FormState> {
   const ip = await ipDoCliente();
   const email = str(f, "email").toLowerCase();
+  if (!EMAIL_VALIDO.test(email)) return { error: "E-mail ou senha incorretos." };
   const db = getDb();
-  const par = `login:falhas:${email}:${ip}`;
-  const global = `login:falhas:${email}`;
+  const par = `login:falhas:par:${email}|${ip}`;
+  const conta = `login:falhas:conta:${email}`;
   if (!(await dentroDoLimite([[`login:ip:${ip}`, 30, JANELA_LOGIN]]))) return MUITAS;
-  if ((await rateLimitCount(db, par, JANELA_LOGIN)) >= FALHAS_POR_PAR) return MUITAS;
-  if ((await rateLimitCount(db, global, JANELA_LOGIN)) >= FALHAS_POR_EMAIL) return MUITAS;
+  const parOk = await consumeRateLimit(db, par, FALHAS_POR_PAR, JANELA_LOGIN);
+  const contaOk = await consumeRateLimit(db, conta, FALHAS_POR_EMAIL, JANELA_LOGIN);
+  if (!parOk || !contaOk) {
+    await Promise.all([refundRateLimit(db, par), refundRateLimit(db, conta)]); // recusada nem chegou a tentar
+    return MUITAS;
+  }
   try {
     await getWebAuth().api.signInEmail({
       body: { email, password: String(f.get("password") ?? ""), rememberMe: true },
       headers: await headers(),
     });
   } catch (err) {
-    await consumeRateLimit(db, par, FALHAS_POR_PAR, JANELA_LOGIN);
-    await consumeRateLimit(db, global, FALHAS_POR_EMAIL, JANELA_LOGIN);
-    return { error: authErrorMessage(err) };
+    return { error: authErrorMessage(err) }; // a falha fica contada
   }
+  await Promise.all([refundRateLimit(db, par), refundRateLimit(db, conta)]); // deu certo: não é falha
   redirect(safeNext(str(f, "next")));
 }
 
@@ -105,12 +114,13 @@ export async function signUpAction(_: FormState, f: FormData): Promise<FormState
  */
 const limitesDeEmail = (fluxo: "magico" | "senha", email: string, ip: string): [string, number, number][] => [
   [`email:ip:${ip}`, 10, 900],
-  [`email:${fluxo}:${email}:${ip}`, 3, 900],
-  [`email:${fluxo}:${email}`, 10, 900],
+  [`email:${fluxo}:par:${email}|${ip}`, 3, 900],
+  [`email:${fluxo}:conta:${email}`, 10, 900],
 ];
 
 export async function magicLinkAction(_: FormState, f: FormData): Promise<FormState> {
   const email = str(f, "email").toLowerCase();
+  if (!EMAIL_VALIDO.test(email)) return { error: "Informe um e-mail válido." };
   if (!(await dentroDoLimite(limitesDeEmail("magico", email, await ipDoCliente())))) return MUITAS;
   try {
     await getWebAuth().api.signInMagicLink({
@@ -133,6 +143,7 @@ export async function githubAction(f: FormData) {
 
 export async function requestResetAction(_: FormState, f: FormData): Promise<FormState> {
   const email = str(f, "email").toLowerCase();
+  if (!EMAIL_VALIDO.test(email)) return { error: "Informe um e-mail válido." };
   if (!(await dentroDoLimite(limitesDeEmail("senha", email, await ipDoCliente())))) return MUITAS;
   try {
     await getWebAuth().api.requestPasswordReset({
