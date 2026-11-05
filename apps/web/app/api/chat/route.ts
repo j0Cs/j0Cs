@@ -1,4 +1,5 @@
 import type { ChatMessage } from "@forja/core";
+import { verificarSaldoBaixo } from "@forja/billing";
 import { authorize, GatewayError, runChat, type Effort } from "@forja/core/server";
 import { and, asc, createGatewayStore, eq, schema } from "@forja/db";
 import { callSystemPrompt } from "@/lib/call";
@@ -51,7 +52,8 @@ export async function POST(request: Request) {
     await authorize(store, { orgId: org.id, modelId: body.modelId, messages: [] });
   } catch (err) {
     if (err instanceof GatewayError) {
-      const status = err.code === "insufficient_credits" ? 402 : err.code === "provider_unavailable" ? 503 : 403;
+      const PAGAMENTO = ["insufficient_credits", "payment_overdue", "trial_ended", "subscription_required"];
+      const status = PAGAMENTO.includes(err.code) ? 402 : err.code === "provider_unavailable" ? 503 : 403;
       return new Response(err.message, { status });
     }
     throw err;
@@ -160,6 +162,13 @@ export async function POST(request: Request) {
               .update(schema.conversations)
               .set({ updatedAt: new Date(), modelId: body.modelId! })
               .where(eq(schema.conversations.id, conv.id));
+            if (event.chargeBrlMicros > 0) {
+              waitUntil(
+                verificarSaldoBaixo(db, org.id).catch((e) =>
+                  console.error(JSON.stringify({ level: "error", msg: "aviso de saldo falhou", err: String(e) })),
+                ),
+              );
+            }
           }
           send(event);
         }

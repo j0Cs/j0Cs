@@ -44,6 +44,7 @@ for (const p of DEFAULT_PLANS) {
         priceBrlCents: p.priceBrlCents,
         includedCreditsBrlCents: p.includedCreditsBrlCents,
         seats: p.seats,
+        minSeats: p.minSeats ?? null,
         maxProjects: p.maxProjects,
         allowedTiers: p.allowedTiers,
         sortOrder: p.sortOrder,

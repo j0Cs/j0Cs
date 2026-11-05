@@ -5,8 +5,19 @@ import { NextResponse, type NextRequest } from "next/server";
  * Checagem otimista: sem cookie de sessão → tela de login. A validação de verdade
  * (sessão no banco, organização, papel) acontece em lib/session.ts em cada página/ação.
  */
-// /api/cron é protegida pelo CRON_SECRET (a Vercel envia no cabeçalho), não por sessão
-const PUBLIC = ["/entrar", "/cadastro", "/recuperar-senha", "/redefinir-senha", "/convite", "/api/auth", "/api/cron"];
+// /api/cron é protegida pelo CRON_SECRET (a Vercel envia no cabeçalho) e o webhook do Stripe pela
+// assinatura do evento (STRIPE_WEBHOOK_SECRET), não por sessão. /precos é a página pública de preços.
+const PUBLIC = [
+  "/entrar",
+  "/cadastro",
+  "/recuperar-senha",
+  "/redefinir-senha",
+  "/convite",
+  "/precos",
+  "/api/auth",
+  "/api/cron",
+  "/api/stripe/webhook",
+];
 
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;

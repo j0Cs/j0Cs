@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@forja/auth": "workspace:*",
+    "@forja/billing": "workspace:*",
     "@forja/core": "workspace:*",
     "@forja/db": "workspace:*",
     "@forja/ui": "workspace:*",

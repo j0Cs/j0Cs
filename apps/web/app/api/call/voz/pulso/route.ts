@@ -1,3 +1,5 @@
+import { verificarSaldoBaixo } from "@forja/billing";
+import { bloqueioDaOrg } from "@forja/core";
 import { and, eq, schema } from "@forja/db";
 import { getApiSession } from "@/lib/session";
 import { waitUntil } from "@vercel/functions";
@@ -20,13 +22,19 @@ export async function POST(request: Request) {
   });
   if (!sessao) return Response.json({ erro: "Chamada não encontrada." }, { status: 404 });
   if (sessao.status !== "active") return Response.json({ encerrar: true, motivo: "Chamada já encerrada." });
-  if (org.status !== "active") {
+  const bloqueio = bloqueioDaOrg(org);
+  if (bloqueio) {
     await cobrarAte(db, sessao, new Date());
-    await encerrarSessao(db, sessao, "conta-suspensa");
-    return Response.json({ encerrar: true, motivo: "Sua conta está suspensa. Fale com o suporte." });
+    await encerrarSessao(db, sessao, "conta-bloqueada");
+    return Response.json({ encerrar: true, motivo: bloqueio.message });
   }
 
   const { cobrado, saldo } = await cobrarAte(db, sessao, new Date());
+  if (cobrado > 0) {
+    waitUntil(
+      verificarSaldoBaixo(db, org.id).catch((e) => console.error(JSON.stringify({ level: "error", msg: "aviso de saldo falhou", err: String(e) }))),
+    );
+  }
   if (Date.now() - sessao.startedAt.getTime() > VOZ_MAX_MINUTOS * 60_000) {
     await encerrarSessao(db, sessao, "duracao-maxima");
     return Response.json({ encerrar: true, motivo: `A call chegou ao limite de ${VOZ_MAX_MINUTOS} minutos. Pode abrir outra para continuar.`, cobrado });

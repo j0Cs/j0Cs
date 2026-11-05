@@ -9,7 +9,7 @@ try {
 }
 
 const config: NextConfig = {
-  transpilePackages: ["@forja/auth", "@forja/core", "@forja/db", "@forja/ui"],
+  transpilePackages: ["@forja/auth", "@forja/billing", "@forja/core", "@forja/db", "@forja/ui"],
   serverExternalPackages: ["pg"],
 };
 

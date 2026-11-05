@@ -36,6 +36,13 @@
       "when": 1793830602352,
       "tag": "0004_seguranca_cobranca",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793889191075,
+      "tag": "0005_cobranca_stripe",
+      "breakpoints": true
     }
   ]
 }

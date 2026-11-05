@@ -20,6 +20,7 @@ São dois produtos sobre o mesmo núcleo:
 5. [E-mail pelo Microsoft 365](docs/05-microsoft-365-email.md): por que Graph, limites e variáveis
 6. [Infraestrutura Supabase + Vercel](docs/06-deploy-supabase-vercel.md): passo a passo, variáveis e custos
 7. [Central e modo call](docs/07-central-e-modo-call.md): experiência imersiva e o agente de voz
+8. [Cobrança com o Stripe](docs/08-cobranca-stripe.md): assinatura, recarga por Pix, inadimplência e o que configurar
 
 Prompts prontos para o Cowork: [login com GitHub](docs/cowork/01-github-login.md) ·
 [e-mail no Microsoft 365](docs/cowork/02-microsoft-365-email.md)

@@ -30,18 +30,19 @@ export async function createOrganizationForUser(db: Db, input: { userId: string;
   }
 
   const org = await db.transaction(async (tx) => {
+    const now = new Date();
+    const fimDoTeste = new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
     const [created] = await tx
       .insert(organizations)
-      .values({ name: input.name.trim(), slug, planId: TRIAL_PLAN_ID })
+      .values({ name: input.name.trim(), slug, planId: TRIAL_PLAN_ID, trialEndsAt: fimDoTeste, planCreditsSince: now })
       .returning();
     await tx.insert(memberships).values({ orgId: created!.id, userId: input.userId, role: "owner" });
-    const now = new Date();
     await tx.insert(subscriptions).values({
       orgId: created!.id,
       planId: TRIAL_PLAN_ID,
       status: "trialing",
       currentPeriodStart: now,
-      currentPeriodEnd: new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
+      currentPeriodEnd: fimDoTeste,
     });
     return created!;
   });

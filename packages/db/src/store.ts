@@ -1,7 +1,7 @@
-import { PROVIDERS, type ModelTier } from "@forja/core";
+import { bloqueioDaOrg, PROVIDERS, type ModelTier } from "@forja/core";
 import { decryptSecret, type GatewayStore, type ProviderKeyCandidate } from "@forja/core/server";
 import { and, asc, eq, sql } from "drizzle-orm";
-import type { Db } from "./client";
+import type { Db, Tx } from "./client";
 import { chavesDoCofre } from "./cofre";
 import { getPricingSettings, toCatalogModel } from "./mappers";
 import { creditLedger, models, organizations, plans, providerKeys, usageEvents } from "./schema";
@@ -20,6 +20,10 @@ export function createGatewayStore(db: Db): GatewayStore {
       const [row] = await db
         .select({
           status: organizations.status,
+          suspendedReason: organizations.suspendedReason,
+          planId: organizations.planId,
+          trialEndsAt: organizations.trialEndsAt,
+          pastDueSince: organizations.pastDueSince,
           balance: organizations.creditBalanceBrlMicros,
           allowedTiers: plans.allowedTiers,
         })
@@ -32,6 +36,7 @@ export function createGatewayStore(db: Db): GatewayStore {
         status: row.status,
         balanceBrlMicros: row.balance,
         allowedTiers: (row.allowedTiers ?? []) as ModelTier[],
+        bloqueio: bloqueioDaOrg(row),
       };
     },
 
@@ -113,7 +118,7 @@ export function createGatewayStore(db: Db): GatewayStore {
 
 /** Lança créditos no extrato e atualiza o saldo (recarga, bônus, ajuste, estorno). */
 export async function addCredits(
-  db: Db,
+  db: Db | Tx,
   input: {
     orgId: string;
     amountBrlMicros: number;
@@ -134,10 +139,59 @@ export async function addCredits(
     });
     const [org] = await tx
       .update(organizations)
-      .set({ creditBalanceBrlMicros: sql`${organizations.creditBalanceBrlMicros} + ${input.amountBrlMicros}` })
+      .set({
+        creditBalanceBrlMicros: sql`${organizations.creditBalanceBrlMicros} + ${input.amountBrlMicros}`,
+        // entrou crédito: o aviso de saldo baixo pode ser enviado de novo
+        ...(input.amountBrlMicros > 0 ? { lowBalanceNotified: null } : {}),
+      })
       .where(eq(organizations.id, input.orgId))
       .returning({ balance: organizations.creditBalanceBrlMicros });
     return org?.balance ?? 0;
   });
 }
 
+
+/**
+ * Lança créditos UMA vez por referência (fatura, recarga, reembolso, expiração): repetir com a
+ * mesma referência não duplica (índice único credit_ledger_referencia_unica). Devolve se lançou.
+ */
+export async function addCreditsOnce(
+  db: Db | Tx,
+  input: {
+    orgId: string;
+    amountBrlMicros: number;
+    kind: "plan_grant" | "topup" | "refund" | "expiry";
+    description: string;
+    referenceId: string;
+  },
+): Promise<{ lancado: boolean; saldo: number }> {
+  return db.transaction(async (tx) => {
+    const [linha] = await tx
+      .insert(creditLedger)
+      .values({
+        orgId: input.orgId,
+        amountBrlMicros: input.amountBrlMicros,
+        kind: input.kind,
+        description: input.description,
+        referenceId: input.referenceId,
+      })
+      .onConflictDoNothing()
+      .returning({ id: creditLedger.id });
+    if (!linha) {
+      const [org] = await tx
+        .select({ balance: organizations.creditBalanceBrlMicros })
+        .from(organizations)
+        .where(eq(organizations.id, input.orgId));
+      return { lancado: false, saldo: org?.balance ?? 0 };
+    }
+    const [org] = await tx
+      .update(organizations)
+      .set({
+        creditBalanceBrlMicros: sql`${organizations.creditBalanceBrlMicros} + ${input.amountBrlMicros}`,
+        ...(input.amountBrlMicros > 0 ? { lowBalanceNotified: null } : {}),
+      })
+      .where(eq(organizations.id, input.orgId))
+      .returning({ balance: organizations.creditBalanceBrlMicros });
+    return { lancado: true, saldo: org?.balance ?? 0 };
+  });
+}

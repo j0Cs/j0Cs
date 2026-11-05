@@ -1,4 +1,4 @@
-import { formatBrlMicros } from "@forja/core";
+import { bloqueioDaOrg, CARENCIA_INADIMPLENCIA_DIAS, diasRestantesDoTeste, formatBrlMicros, TRIAL_PLAN_ID } from "@forja/core";
 import { Notice } from "@forja/ui";
 import { Shell } from "@forja/ui/shell";
 import { CreditCard, FolderKanban, Gauge, LogOut, Orbit, Plug, Users } from "lucide-react";
@@ -11,6 +11,11 @@ const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Forja";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const { org, plan, user } = await getSession();
+  const bloqueio = bloqueioDaOrg(org);
+  const diasDeTeste = org.planId === TRIAL_PLAN_ID ? diasRestantesDoTeste(org.trialEndsAt) : null;
+  const diasDeCarencia = org.pastDueSince
+    ? Math.max(0, CARENCIA_INADIMPLENCIA_DIAS - Math.floor((Date.now() - org.pastDueSince.getTime()) / 86_400_000))
+    : null;
   return (
     <Shell
       brand={APP_NAME}
@@ -21,7 +26,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         { href: "/conectores", label: "Conectores", icon: <Plug size={16} /> },
         { href: "/custos", label: "Custos e uso", icon: <Gauge size={16} /> },
         { href: "/equipe", label: "Equipe", icon: <Users size={16} /> },
-        { href: "/plano", label: "Plano e modelos", icon: <CreditCard size={16} /> },
+        { href: "/plano", label: "Plano e cobrança", icon: <CreditCard size={16} /> },
       ]}
       footer={
         <div className="space-y-3">
@@ -43,6 +48,38 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         </div>
       }
     >
+      {bloqueio ? (
+        <div className="mb-4">
+          <Notice tone="red">
+            {bloqueio.message}{" "}
+            {bloqueio.code !== "org_inactive" ? (
+              <Link href="/plano" className="font-medium underline">
+                Ver planos e pagamentos
+              </Link>
+            ) : null}
+          </Notice>
+        </div>
+      ) : diasDeCarencia !== null ? (
+        <div className="mb-4">
+          <Notice>
+            A cobrança da assinatura não passou. Regularize {diasDeCarencia <= 1 ? "até amanhã" : `em até ${diasDeCarencia} dias`} para o uso
+            não ser pausado.{" "}
+            <Link href="/plano" className="font-medium underline">
+              Pagar agora
+            </Link>
+          </Notice>
+        </div>
+      ) : diasDeTeste !== null && diasDeTeste <= 3 ? (
+        <div className="mb-4">
+          <Notice>
+            {diasDeTeste === 0 ? "Seu teste grátis termina hoje." : `Seu teste grátis termina em ${diasDeTeste} dia(s).`} Assine para continuar
+            sem parar.{" "}
+            <Link href="/plano#planos" className="font-medium underline">
+              Ver planos
+            </Link>
+          </Notice>
+        </div>
+      ) : null}
       {!user.emailVerified ? (
         <div className="mb-4">
           <Notice>

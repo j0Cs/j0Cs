@@ -53,19 +53,22 @@ provedor, com o custo aparecendo em "Custos" e no painel do dono.
 
 Objetivo: o cliente assina, paga, recebe créditos e é cobrado de novo todo mês, sem ninguém mexer à mão.
 
+> **Adiantada em 05/11**: a parte de código está pronta e testada com um Stripe simulado (doc 8). Falta a sua parte:
+> conta Stripe, chaves de teste, webhook e portal (doc 8, "O que você configura"), e o teste com o Stripe de verdade.
+
 - [ ] **[Você]** Conta Stripe Brasil verificada (CNPJ e conta bancária); chaves de **teste** já na primeira semana
-- [ ] **[Claude]** Assinatura dos planos (Starter, Pro, Max, Equipe por assento) pelo Stripe Checkout, no cartão ou
-  boleto; Customer Portal em português para trocar de plano, atualizar cartão e cancelar
-- [ ] **[Claude]** Webhooks idempotentes (cada evento processado uma única vez): `invoice.paid` → créditos do plano no
+- [x] **[Claude]** Assinatura dos planos (Starter, Pro, Max, Equipe por assento) pelo Stripe Checkout, no cartão ou
+  boleto; troca de plano e de assentos no próprio app; Customer Portal em português para cartão, faturas e cancelamento
+- [x] **[Claude]** Webhooks idempotentes (cada evento processado uma única vez): `invoice.paid` → créditos do plano no
   ciclo; mudança ou cancelamento de assinatura → plano e assentos atualizados
-- [ ] **[Claude]** Recarga avulsa por **Pix** ou cartão, com o crédito entrando na hora do pagamento
-- [ ] **[Claude]** E-mails de saldo baixo (20% e 5%) e de recarga confirmada
-- [ ] **[Claude]** Inadimplência: aviso no pagamento recusado, 3 dias de carência, suspensão automática e reativação
+- [x] **[Claude]** Recarga avulsa por **Pix** ou cartão, com o crédito entrando na hora do pagamento
+- [x] **[Claude]** E-mails de saldo baixo (20% e 5%) e de recarga confirmada
+- [x] **[Claude]** Inadimplência: aviso no pagamento recusado, 3 dias de carência, suspensão automática e reativação
   quando pagar
-- [ ] **[Claude]** Fim do teste grátis em 7 dias (verificação diária, compatível com o Hobby): bloqueia o uso, mantém
+- [x] **[Claude]** Fim do teste grátis em 7 dias (verificação diária, compatível com o Hobby): bloqueia o uso, mantém
   os dados e mostra o caminho para assinar
-- [ ] **[Claude]** Página pública de preços (`/precos`) ligada ao checkout
-- [ ] **[Claude]** Painel do dono: assinaturas, receita por mês, falhas de pagamento e reembolso
+- [x] **[Claude]** Página pública de preços (`/precos`) ligada ao checkout
+- [x] **[Claude]** Painel do dono: assinaturas, receita por mês, falhas de pagamento e reembolso
 - [ ] **[Claude]** Rascunho de termos de uso e política de privacidade; **[Você]** revisão com advogado
 - [ ] **[Você]** CNPJ, regime tributário e emissor de NFS-e com o contador (doc 3, seção 7). A emissão automática
   (NFE.io) entra assim que houver CNPJ; se atrasar, ela passa para a Sprint 4

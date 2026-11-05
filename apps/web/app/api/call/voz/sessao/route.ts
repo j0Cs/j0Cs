@@ -1,3 +1,4 @@
+import { bloqueioDaOrg } from "@forja/core";
 import { createLiveSession, endLiveSession } from "@forja/core/server";
 import { and, consumeRateLimit, createGatewayStore, eq, schema } from "@forja/db";
 import { garantirProjeto } from "@/lib/projects";
@@ -21,7 +22,8 @@ export async function POST(request: Request) {
   const session = await getApiSession();
   if (!session) return Response.json({ erro: "Não autenticado." }, { status: 401 });
   const { db, org, plan, user } = session;
-  if (org.status !== "active") return Response.json({ erro: "Sua conta está suspensa. Fale com o suporte." }, { status: 403 });
+  const bloqueio = bloqueioDaOrg(org);
+  if (bloqueio) return Response.json({ erro: bloqueio.message }, { status: bloqueio.code === "org_inactive" ? 403 : 402 });
   if (!user.emailVerified) return Response.json({ erro: "Confirme seu e-mail para usar a voz." }, { status: 403 });
 
   const body = (await request.json().catch(() => ({}))) as { sdp?: string; projeto?: string; reserva?: string; voz?: string };

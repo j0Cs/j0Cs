@@ -102,3 +102,35 @@ describe("catálogo", () => {
     }
   });
 });
+
+import { bloqueioDaOrg, diasRestantesDoTeste } from "../src/acesso";
+
+describe("bloqueio da organização", () => {
+  const agora = new Date("2026-11-20T12:00:00Z");
+  const dia = 86_400_000;
+  const base = { status: "active" as const, planId: "pro", suspendedReason: null, trialEndsAt: null, pastDueSince: null };
+
+  it("ativa com plano: liberada", () => {
+    expect(bloqueioDaOrg(base, agora)).toBeNull();
+  });
+  it("sem plano", () => {
+    expect(bloqueioDaOrg({ ...base, planId: null }, agora)?.code).toBe("subscription_required");
+  });
+  it("teste vencido e teste em andamento", () => {
+    expect(bloqueioDaOrg({ ...base, planId: "trial", trialEndsAt: new Date(agora.getTime() - 1) }, agora)?.code).toBe("trial_ended");
+    expect(bloqueioDaOrg({ ...base, planId: "trial", trialEndsAt: new Date(agora.getTime() + dia) }, agora)).toBeNull();
+  });
+  it("inadimplência: carência de 3 dias, depois bloqueia mesmo antes da varredura", () => {
+    expect(bloqueioDaOrg({ ...base, pastDueSince: new Date(agora.getTime() - 2 * dia) }, agora)).toBeNull();
+    expect(bloqueioDaOrg({ ...base, pastDueSince: new Date(agora.getTime() - 3 * dia) }, agora)?.code).toBe("payment_overdue");
+  });
+  it("suspensa por inadimplência ou à mão", () => {
+    expect(bloqueioDaOrg({ ...base, status: "suspended", suspendedReason: "inadimplencia" }, agora)?.code).toBe("payment_overdue");
+    expect(bloqueioDaOrg({ ...base, status: "suspended", suspendedReason: "manual" }, agora)?.code).toBe("org_inactive");
+  });
+  it("dias restantes do teste", () => {
+    expect(diasRestantesDoTeste(new Date(agora.getTime() + 2.5 * dia), agora)).toBe(3);
+    expect(diasRestantesDoTeste(new Date(agora.getTime() - dia), agora)).toBe(0);
+    expect(diasRestantesDoTeste(null, agora)).toBeNull();
+  });
+});

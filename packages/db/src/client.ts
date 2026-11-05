@@ -5,6 +5,8 @@ import * as schema from "./schema";
 import { SUPABASE_ROOT_CA_2021 } from "./supabase-ca";
 
 export type Db = NodePgDatabase<typeof schema>;
+/** Transação aberta com `db.transaction` (aceita as mesmas consultas). */
+export type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 const g = globalThis as unknown as { __forjaDb?: Db; __forjaPool?: pg.Pool };
 

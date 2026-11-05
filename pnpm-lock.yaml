@@ -20,6 +20,9 @@ importers:
       '@forja/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@forja/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
       '@forja/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -75,6 +78,9 @@ importers:
       '@forja/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@forja/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
       '@forja/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -149,6 +155,40 @@ importers:
       '@types/node':
         specifier: ^22.19.0
         version: 22.20.5
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
+
+  packages/billing:
+    dependencies:
+      '@forja/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@forja/core':
+        specifier: workspace:*
+        version: link:../core
+      '@forja/db':
+        specifier: workspace:*
+        version: link:../db
+      stripe:
+        specifier: 23.0.1
+        version: 23.0.1(@types/node@22.20.5)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.0
+        version: 22.20.5
+      '@types/pg':
+        specifier: ^8.15.0
+        version: 8.23.1
+      pg:
+        specifier: ^8.23.1
+        version: 8.23.1
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -2091,6 +2131,15 @@ packages:
     resolution: {integrity: sha512-BrpvfNAE3dcvq7ll3xVumzjKjZQ5tI1sEUIKr3Uoks0XUl45St3FlatVqef9prk4jRDzhW6WZg+3bk93y6pLjA==}
     engines: {node: '>=6'}
 
+  stripe@23.0.1:
+    resolution: {integrity: sha512-VFLs9IAzSZ8GIm6/vqhjqOL0fbYrSNYCpgZ3LS3YkSi/i5RnyMpu/Hf9YxPTOCYwc3mZKU3IJvuvKffQH2NLMg==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@types/node': '>=20'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+
   styled-jsx@5.1.6:
     resolution: {integrity: sha512-qSVyDTeMotdvQYoHWLNGwRFJHC+i+ZvdBRYosOFgC+Wg1vx4frN2/RG/NA7SYqqvKNLf39P2LSRA2pu6n0XYZA==}
     engines: {node: '>= 12.0.0'}
@@ -3657,6 +3706,10 @@ snapshots:
       ansi-regex: 5.0.1
 
   strip-final-newline@2.0.0: {}
+
+  stripe@23.0.1(@types/node@22.20.5):
+    optionalDependencies:
+      '@types/node': 22.20.5
 
   styled-jsx@5.1.6(react@19.3.1):
     dependencies:

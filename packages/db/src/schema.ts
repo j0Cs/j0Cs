@@ -24,7 +24,13 @@ export const providerIdEnum = pgEnum("provider_id", ["anthropic", "openai", "goo
 export const modelTierEnum = pgEnum("model_tier", ["economico", "intermediario", "avancado", "premium"]);
 export const orgStatusEnum = pgEnum("org_status", ["active", "suspended"]);
 export const memberRoleEnum = pgEnum("member_role", ["owner", "admin", "member"]);
-export const subscriptionStatusEnum = pgEnum("subscription_status", ["trialing", "active", "past_due", "canceled"]);
+export const subscriptionStatusEnum = pgEnum("subscription_status", [
+  "trialing",
+  "active",
+  "past_due",
+  "canceled",
+  "incomplete",
+]);
 export const usageStatusEnum = pgEnum("usage_status", ["ok", "refused", "error", "aborted"]);
 export const ledgerKindEnum = pgEnum("ledger_kind", ["plan_grant", "topup", "usage", "adjustment", "refund", "expiry"]);
 export const keyStatusEnum = pgEnum("key_status", ["active", "disabled"]);
@@ -132,21 +138,39 @@ export const plans = pgTable("plans", {
   seats: integer("seats").notNull().default(1),
   maxProjects: integer("max_projects"),
   allowedTiers: modelTierEnum("allowed_tiers").array().notNull().$type<ModelTier[]>(),
+  /** Plano cobrado por assento (quantidade na assinatura), com este mínimo. Vazio = quantidade fixa 1. */
+  minSeats: integer("min_seats"),
   active: boolean("active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
-export const organizations = pgTable("organizations", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  status: orgStatusEnum("status").notNull().default("active"),
-  planId: text("plan_id").references(() => plans.id),
-  /** Saldo atual (cache da soma do extrato, atualizado na mesma transação). */
-  creditBalanceBrlMicros: money("credit_balance_brl_micros"),
-  billingCustomerId: text("billing_customer_id"),
-  createdAt: createdAt(),
-});
+export const organizations = pgTable(
+  "organizations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    status: orgStatusEnum("status").notNull().default("active"),
+    /** Por que está suspensa: "inadimplencia" (reativa sozinha quando o pagamento entra) ou "manual". */
+    suspendedReason: text("suspended_reason"),
+    /** Plano em vigor (o da última fatura paga). Vazio = sem plano: o uso fica bloqueado. */
+    planId: text("plan_id").references(() => plans.id),
+    /** Fim do teste grátis (só vale enquanto o plano for "trial"). */
+    trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+    /** Primeira cobrança recusada ainda em aberto; com 3 dias, a conta é suspensa. */
+    pastDueSince: timestamp("past_due_since", { withTimezone: true }),
+    /** Início do ciclo atual dos créditos do plano (eles expiram na renovação). */
+    planCreditsSince: timestamp("plan_credits_since", { withTimezone: true }),
+    /** Último aviso de saldo baixo enviado (20 ou 5, em %). Volta a vazio quando entram créditos. */
+    lowBalanceNotified: integer("low_balance_notified"),
+    /** Saldo atual (cache da soma do extrato, atualizado na mesma transação). */
+    creditBalanceBrlMicros: money("credit_balance_brl_micros"),
+    /** Cliente no Stripe (cus_...). */
+    billingCustomerId: text("billing_customer_id"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("organizations_billing_customer_unico").on(t.billingCustomerId).where(sql`${t.billingCustomerId} is not null`)],
+);
 
 export const memberships = pgTable(
   "memberships",
@@ -176,19 +200,31 @@ export const invitations = pgTable(
   (t) => [index("invitations_org_idx").on(t.orgId)],
 );
 
-export const subscriptions = pgTable("subscriptions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
-  planId: text("plan_id").notNull().references(() => plans.id),
-  status: subscriptionStatusEnum("status").notNull().default("trialing"),
-  seats: integer("seats").notNull().default(1),
-  currentPeriodStart: timestamp("current_period_start", { withTimezone: true }).notNull(),
-  currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
-  /** stripe | asaas | manual */
-  billingProvider: text("billing_provider").notNull().default("manual"),
-  externalId: text("external_id"),
-  createdAt: createdAt(),
-});
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    /** Plano cobrado na próxima fatura (numa redução, muda antes do plano em vigor da organização). */
+    planId: text("plan_id").notNull().references(() => plans.id),
+    status: subscriptionStatusEnum("status").notNull().default("trialing"),
+    seats: integer("seats").notNull().default(1),
+    /** Valor mensal cobrado (preço × assentos), em centavos. */
+    amountBrlCents: integer("amount_brl_cents").notNull().default(0),
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+    currentPeriodStart: timestamp("current_period_start", { withTimezone: true }).notNull(),
+    currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }).notNull(),
+    /** stripe | manual */
+    billingProvider: text("billing_provider").notNull().default("manual"),
+    externalId: text("external_id"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("subscriptions_org_idx").on(t.orgId, t.createdAt),
+    uniqueIndex("subscriptions_externa_unica").on(t.billingProvider, t.externalId).where(sql`${t.externalId} is not null`),
+  ],
+);
 
 // ---------------------------------------------------------------------------
 // Catálogo e chaves (gestão do dono)
@@ -350,8 +386,61 @@ export const creditLedger = pgTable(
     createdBy: uuid("created_by"),
     createdAt: createdAt(),
   },
-  (t) => [index("credit_ledger_org_created_idx").on(t.orgId, t.createdAt)],
+  (t) => [
+    index("credit_ledger_org_created_idx").on(t.orgId, t.createdAt),
+    // um crédito/estorno por fatura, recarga ou reembolso, mesmo se o webhook chegar duas vezes
+    uniqueIndex("credit_ledger_referencia_unica")
+      .on(t.kind, t.referenceId)
+      .where(sql`${t.referenceId} is not null and ${t.kind} in ('plan_grant', 'topup', 'refund', 'expiry')`),
+  ],
 );
+
+/**
+ * Pagamentos (faturas da assinatura e recargas), espelho do Stripe para o painel do dono e o
+ * histórico do cliente. O dinheiro de verdade fica no Stripe; aqui só o necessário para exibir,
+ * reembolsar e estornar os créditos na proporção certa.
+ */
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    /** assinatura | recarga */
+    kind: text("kind").notNull(),
+    /** in_... (fatura) ou cs_... (checkout da recarga) */
+    externalId: text("external_id").notNull().unique(),
+    paymentIntentId: text("payment_intent_id"),
+    amountBrlCents: integer("amount_brl_cents").notNull(),
+    /** Créditos lançados por este pagamento (base do estorno proporcional num reembolso). */
+    creditsBrlMicros: money("credits_brl_micros"),
+    /** pending | paid | failed | refunded | partially_refunded */
+    status: text("status").notNull(),
+    /** card | boleto | pix */
+    method: text("method"),
+    refundedBrlCents: integer("refunded_brl_cents").notNull().default(0),
+    description: text("description").notNull().default(""),
+    hostedUrl: text("hosted_url"),
+    failureMessage: text("failure_message"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("payments_org_created_idx").on(t.orgId, t.createdAt),
+    index("payments_status_idx").on(t.status, t.createdAt),
+    index("payments_intent_idx").on(t.paymentIntentId),
+  ],
+);
+
+/** Eventos do Stripe já processados: cada webhook tem efeito uma única vez. */
+export const stripeEvents = pgTable("stripe_events", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  /** Quando o Stripe criou o evento. */
+  eventCreatedAt: timestamp("event_created_at", { withTimezone: true }).notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 /**
  * Chamadas de voz em nuvem (cobradas por segundo). O servidor cria a sessão no provedor,

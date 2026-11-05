@@ -1,3 +1,4 @@
+import { MENSAGENS_DE_BLOQUEIO, type BloqueioCode } from "./acesso";
 import { computeChargeBrlMicros, computeCostUsdMicros } from "./pricing";
 import { DEFAULT_ADAPTERS } from "./providers";
 import type { Effort, ProviderAdapter } from "./providers/types";
@@ -24,6 +25,8 @@ export interface OrgAccess {
   status: "active" | "suspended";
   balanceBrlMicros: number;
   allowedTiers: ModelTier[];
+  /** Teste acabou, sem plano, inadimplente ou suspensa (regra em acesso.ts). */
+  bloqueio?: { code: BloqueioCode; message: string } | null;
 }
 
 export interface ProviderKeyCandidate {
@@ -86,6 +89,9 @@ export interface GatewayChatRequest {
 export type GatewayErrorCode =
   | "model_unavailable"
   | "org_inactive"
+  | "payment_overdue"
+  | "trial_ended"
+  | "subscription_required"
   | "plan_upgrade_required"
   | "insufficient_credits"
   | "provider_unavailable"
@@ -123,7 +129,10 @@ export interface GatewayDeps {
 
 const ERROR_MESSAGES: Record<Exclude<GatewayErrorCode, "provider_error">, string> = {
   model_unavailable: "Este modelo não está disponível no momento.",
-  org_inactive: "Sua conta está suspensa. Fale com o suporte.",
+  org_inactive: MENSAGENS_DE_BLOQUEIO.org_inactive,
+  payment_overdue: MENSAGENS_DE_BLOQUEIO.payment_overdue,
+  trial_ended: MENSAGENS_DE_BLOQUEIO.trial_ended,
+  subscription_required: MENSAGENS_DE_BLOQUEIO.subscription_required,
   plan_upgrade_required: "Seu plano não inclui este modelo. Faça upgrade para usá-lo.",
   insufficient_credits: "Saldo de créditos insuficiente. Faça uma recarga para continuar.",
   provider_unavailable: "Provedor sem chave ativa configurada.",
@@ -137,7 +146,9 @@ export async function authorize(store: GatewayStore, req: GatewayChatRequest) {
   if (!model || !model.enabled) throw fail("model_unavailable");
 
   const access = await store.getOrgAccess(req.orgId);
-  if (!access || access.status !== "active") throw fail("org_inactive");
+  if (!access) throw fail("org_inactive");
+  if (access.bloqueio) throw fail(access.bloqueio.code);
+  if (access.status !== "active") throw fail("org_inactive");
   if (!access.allowedTiers.includes(model.tier)) throw fail("plan_upgrade_required");
 
   const settings = await store.getSettings();

@@ -305,6 +305,7 @@ export const DEFAULT_PLANS: PlanDefinition[] = [
     priceBrlCents: 397_00,
     includedCreditsBrlCents: 260_00,
     seats: 1,
+    minSeats: 3,
     maxProjects: null,
     allowedTiers: ALL_TIERS,
     description: "Mínimo 3 assentos; créditos somados num saldo único da empresa.",

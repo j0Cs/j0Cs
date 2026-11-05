@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Forja";
@@ -11,7 +12,10 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       </div>
       <div className="w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">{children}</div>
       <p className="mt-6 max-w-sm text-center text-xs text-zinc-500">
-        Claude, GPT, Gemini e Grok num só lugar, cobrado em reais.
+        Claude, GPT, Gemini e Grok num só lugar, cobrado em reais.{" "}
+        <Link href="/precos" className="font-medium text-zinc-700 underline">
+          Ver planos e preços
+        </Link>
       </p>
     </div>
   );

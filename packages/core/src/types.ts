@@ -97,6 +97,8 @@ export interface PlanDefinition {
   /** Créditos incluídos por ciclo, em centavos de real. */
   includedCreditsBrlCents: number;
   seats: number;
+  /** Cobrado por assento (quantidade na assinatura), com este mínimo. Ausente = quantidade fixa 1. */
+  minSeats?: number | null;
   maxProjects: number | null;
   allowedTiers: ModelTier[];
   description: string;

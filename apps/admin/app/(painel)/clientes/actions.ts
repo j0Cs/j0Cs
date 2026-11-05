@@ -1,5 +1,6 @@
 "use server";
 
+import { TRIAL_DAYS, TRIAL_PLAN_ID } from "@forja/core";
 import { addCredits, eq, schema } from "@forja/db";
 import { revalidatePath } from "next/cache";
 import { adminDb, num, requireStaff } from "@/lib/admin";
@@ -23,16 +24,19 @@ export async function setOrgStatus(formData: FormData) {
   const status = String(formData.get("status")) === "suspended" ? "suspended" : "active";
   await (await adminDb())
     .update(schema.organizations)
-    .set({ status })
+    // reativar à mão também zera a carência de inadimplência (decisão do dono)
+    .set(status === "suspended" ? { status, suspendedReason: "manual" } : { status, suspendedReason: null, pastDueSince: null })
     .where(eq(schema.organizations.id, String(formData.get("orgId"))));
   revalidatePath("/clientes");
 }
 
 export async function setOrgPlan(formData: FormData) {
   await requireStaff();
+  const planId = String(formData.get("planId"));
   await (await adminDb())
     .update(schema.organizations)
-    .set({ planId: String(formData.get("planId")) })
+    // voltar para o teste dá mais 7 dias a partir de agora
+    .set(planId === TRIAL_PLAN_ID ? { planId, trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000) } : { planId })
     .where(eq(schema.organizations.id, String(formData.get("orgId"))));
   revalidatePath("/clientes");
 }

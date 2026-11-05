@@ -116,6 +116,8 @@ openssl rand -base64 32
 | `ADMIN_IP_ALLOWLIST` | | opcional | IPs liberados no painel, separados por vírgula |
 | `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `EMAIL_FROM` | ✔ | ✔ | doc 5 / `cowork/02-microsoft-365-email.md` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | ✔ | | `cowork/01-github-login.md` |
+| `STRIPE_SECRET_KEY` | ✔ | ✔ | doc 8 (o painel usa para reembolsar) |
+| `STRIPE_WEBHOOK_SECRET` | ✔ | | doc 8 (assinatura do webhook `/api/stripe/webhook`) |
 | `WEB_URL` / `ADMIN_URL` | opcional | opcional | sem elas, cada app usa o próprio domínio de produção da Vercel (`VERCEL_PROJECT_PRODUCTION_URL`), que passa a ser o domínio próprio quando você ligar um. Se um app tiver **mais de um** domínio próprio, defina a variável com o endereço canônico (o mesmo do callback do GitHub): a Vercel escolhe o domínio mais curto |
 | `ANTHROPIC_API_KEY` etc. | | | **não**: as chaves dos provedores são cadastradas no painel e ficam cifradas no banco |
 
