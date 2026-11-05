@@ -1,4 +1,5 @@
 export * from "./client";
+export * from "./cofre";
 export * from "./mappers";
 export * from "./orgs";
 export * from "./queries";

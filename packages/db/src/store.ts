@@ -2,6 +2,7 @@ import { PROVIDERS, type ModelTier } from "@forja/core";
 import { decryptSecret, type GatewayStore, type ProviderKeyCandidate } from "@forja/core/server";
 import { and, asc, eq, sql } from "drizzle-orm";
 import type { Db } from "./client";
+import { chavesDoCofre } from "./cofre";
 import { getPricingSettings, toCatalogModel } from "./mappers";
 import { creditLedger, models, organizations, plans, providerKeys, usageEvents } from "./schema";
 
@@ -46,6 +47,8 @@ export function createGatewayStore(db: Db): GatewayStore {
       const candidates: ProviderKeyCandidate[] = [
         ...byok.map((r) => ({ id: r.id, apiKey: decryptSecret(r.encryptedKey), byok: true })),
         ...platform.map((r) => ({ id: r.id, apiKey: decryptSecret(r.encryptedKey) })),
+        // Vault da Supabase (CLAUDE_KEY, OPENAI_KEY, GEMINI_API, GROK_API): depois das chaves do painel
+        ...(await chavesDoCofre(db, providerId)).map((c) => ({ id: c.id, apiKey: c.secret })),
       ];
 
       // Em desenvolvimento, aceita a chave do .env para testar sem cadastrar no painel.

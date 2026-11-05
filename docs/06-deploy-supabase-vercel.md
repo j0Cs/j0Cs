@@ -46,6 +46,25 @@ Decisão do dono: publicar já no plano **Hobby**, para testar antes do lançame
 
 **Ao passar para o Pro**: volte o cron para `* * * * *` em `apps/web/vercel.json` e faça um *Redeploy*.
 
+## Chaves dos provedores no Vault da Supabase
+
+Além da tela **Chaves de API** do painel, o app lê as chaves direto do **Vault** do banco (Supabase → Database →
+Vault → *Add new secret*), com estes nomes:
+
+| Provedor | Nome no Vault (também aceito) |
+|---|---|
+| Anthropic (Claude) | `CLAUDE_KEY` (`ANTHROPIC_API_KEY`) |
+| OpenAI (inclui a voz natural do Hefesto) | `OPENAI_KEY` (`OPENAI_API_KEY`) |
+| Google (Gemini) | `GEMINI_API` (`GEMINI_API_KEY`) |
+| xAI (Grok) | `GROK_API` (`XAI_API_KEY`) |
+
+- O app conecta como `postgres` e lê `vault.decrypted_secrets`; o valor não aparece em tela, log nem repositório.
+  O painel mostra só quais nomes existem (Chaves de API → *Chaves no Vault da Supabase*).
+- Troca de valor vale em até 1 minuto, sem deploy.
+- Ordem de uso: chaves do painel primeiro (com prioridade e rodízio), depois as do Vault.
+- **Edge Functions → Secrets não serve**: esses segredos só existem dentro das Edge Functions da Supabase, e a Forja
+  roda na Vercel.
+
 ## Arquitetura
 
 ```
