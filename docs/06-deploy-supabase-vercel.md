@@ -46,24 +46,25 @@ Decisão do dono: publicar já no plano **Hobby**, para testar antes do lançame
 
 **Ao passar para o Pro**: volte o cron para `* * * * *` em `apps/web/vercel.json` e faça um *Redeploy*.
 
-## Chaves dos provedores no Vault da Supabase
+## Chaves dos provedores nos Secrets do Supabase
 
-Além da tela **Chaves de API** do painel, o app lê as chaves direto do **Vault** do banco (Supabase → Database →
-Vault → *Add new secret*), com estes nomes:
+As chaves de API da plataforma ficam em **Supabase → Edge Functions → Secrets** (projeto `projeto_27`), com estes nomes:
 
-| Provedor | Nome no Vault (também aceito) |
+| Provedor | Nome (também aceito) |
 |---|---|
 | Anthropic (Claude) | `CLAUDE_KEY` (`ANTHROPIC_API_KEY`) |
 | OpenAI (inclui a voz natural do Hefesto) | `OPENAI_KEY` (`OPENAI_API_KEY`) |
 | Google (Gemini) | `GEMINI_API` (`GEMINI_API_KEY`) |
 | xAI (Grok) | `GROK_API` (`XAI_API_KEY`) |
 
-- O app conecta como `postgres` e lê `vault.decrypted_secrets`; o valor não aparece em tela, log nem repositório.
-  O painel mostra só quais nomes existem (Chaves de API → *Chaves no Vault da Supabase*).
-- Troca de valor vale em até 1 minuto, sem deploy.
-- Ordem de uso: chaves do painel primeiro (com prioridade e rodízio), depois as do Vault.
-- **Edge Functions → Secrets não serve**: esses segredos só existem dentro das Edge Functions da Supabase, e a Forja
-  roda na Vercel.
+- Esses Secrets só existem dentro das Edge Functions. Por isso a função **`forja-chaves`**
+  (`supabase/functions/forja-chaves`, publicada com `verify_jwt = false`) lê os quatro e entrega à Forja.
+- Ela só responde a quem envia a chave secreta do projeto (`SUPABASE_SECRET_KEY` ou `SUPABASE_SERVICE_ROLE_KEY`,
+  cadastradas nos apps pela integração Supabase ↔ Vercel). Sem a chave: 401.
+- O app guarda as chaves em memória por 2 minutos: trocar um Secret vale nesse prazo, sem deploy.
+- Ordem de uso: chave própria do cliente (se houver), Secrets do Supabase, chaves cadastradas no painel.
+- O painel mostra quais nomes foram encontrados (Chaves de API), nunca o valor.
+- Para republicar a função depois de mudar o código: `supabase functions deploy forja-chaves --no-verify-jwt`.
 
 ## Arquitetura
 

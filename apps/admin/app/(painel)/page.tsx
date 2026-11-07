@@ -15,7 +15,7 @@ import {
   asc,
   getEconomics,
   getPricingSettings,
-  nomesNoCofre,
+  nomesNosSecrets,
   platformCostByModel,
   platformCostByProvider,
   platformOverview,
@@ -37,14 +37,14 @@ export default async function Overview() {
     db.select().from(schema.plans).orderBy(asc(schema.plans.sortOrder)),
     db.select({ providerId: schema.providerKeys.providerId }).from(schema.providerKeys),
   ]);
-  const noCofre = await nomesNoCofre(db);
+  const nosSecrets = await nomesNosSecrets();
 
   const apiCostBrl = effectiveCostBrlMicros(overview.costUsdMicros, settings);
   const usageMargin = overview.chargeBrlMicros - apiCostBrl;
   const usageMarginPct = overview.chargeBrlMicros ? (usageMargin / overview.chargeBrlMicros) * 100 : 0;
   const errorRate = overview.requests ? (overview.errors / overview.requests) * 100 : 0;
   const providersWithoutKey = (Object.keys(PROVIDERS) as (keyof typeof PROVIDERS)[]).filter(
-    (p) => !keys.some((k) => k.providerId === p) && !noCofre.some((c) => c.providerId === p),
+    (p) => !keys.some((k) => k.providerId === p) && !nosSecrets.some((c) => c.providerId === p),
   );
 
   return (
@@ -58,7 +58,7 @@ export default async function Overview() {
         <div className="mb-4">
           <Notice>
             Sem chave cadastrada para: {providersWithoutKey.map((p) => PROVIDERS[p].name).join(", ")}. Os modelos desses provedores
-            vão falhar para os clientes até você adicionar uma chave em <b>Chaves de API</b> ou no Vault da Supabase.
+            vão falhar para os clientes até você adicionar uma chave nos Secrets do Supabase (Edge Functions).
           </Notice>
         </div>
       ) : null}

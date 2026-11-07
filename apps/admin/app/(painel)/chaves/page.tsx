@@ -1,5 +1,5 @@
 import { PROVIDERS, type ProviderId } from "@forja/core";
-import { asc, isNull, NOMES_NO_COFRE, nomesNoCofre, schema } from "@forja/db";
+import { asc, isNull, NOMES_NOS_SECRETS, nomesNosSecrets, schema } from "@forja/db";
 import { Badge, Button, Card, CardHeader, cx, EmptyState, Field, inputBaseClass, inputClass, Notice, PageHeader, Table, Td, Th } from "@forja/ui";
 import { adminDb } from "@/lib/admin";
 import { addKey, deleteKey, setPriority, toggleKey } from "./actions";
@@ -14,7 +14,7 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
     .from(schema.providerKeys)
     .where(isNull(schema.providerKeys.orgId))
     .orderBy(asc(schema.providerKeys.providerId), asc(schema.providerKeys.priority));
-  const noCofre = await nomesNoCofre(db);
+  const nosSecrets = await nomesNosSecrets();
 
   return (
     <>
@@ -119,20 +119,19 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
         </Card>
         <Card className="lg:col-span-2">
           <CardHeader
-            title="Chaves no Vault da Supabase"
-            description="Lidas direto do banco (Database → Vault), depois das chaves desta página. Troque o valor lá e ele vale em até 1 minuto. Aqui aparecem só os nomes, nunca o valor."
+            title="Chaves nos Secrets do Supabase"
+            description="As chaves da plataforma ficam em Supabase → Edge Functions → Secrets e são lidas pela função forja-chaves. Trocou lá, vale em até 2 minutos. Aqui aparecem só os nomes encontrados, nunca o valor."
           />
           <Table>
             <thead>
               <tr>
                 <Th>Provedor</Th>
-                <Th>Nome no Vault</Th>
-                <Th>Atualizada em</Th>
+                <Th>Nome nos Secrets</Th>
               </tr>
             </thead>
             <tbody>
-              {(Object.keys(NOMES_NO_COFRE) as ProviderId[]).map((p) => {
-                const achada = noCofre.find((c) => c.providerId === p);
+              {(Object.keys(NOMES_NOS_SECRETS) as ProviderId[]).map((p) => {
+                const achada = nosSecrets.find((c) => c.providerId === p);
                 return (
                   <tr key={p}>
                     <Td className="font-medium text-zinc-900">{PROVIDERS[p].name}</Td>
@@ -140,11 +139,8 @@ export default async function KeysPage({ searchParams }: { searchParams: Promise
                       {achada ? (
                         <Badge tone="green">{achada.name}</Badge>
                       ) : (
-                        <span className="text-xs text-zinc-500">não encontrada (nome esperado: {NOMES_NO_COFRE[p][0]})</span>
+                        <span className="text-xs text-zinc-500">não encontrada (nome esperado: {NOMES_NOS_SECRETS[p][0]})</span>
                       )}
-                    </Td>
-                    <Td className="text-xs">
-                      {achada?.updatedAt ? achada.updatedAt.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—"}
                     </Td>
                   </tr>
                 );

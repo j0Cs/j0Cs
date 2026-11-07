@@ -1,6 +1,6 @@
 import { computeChargeBrlMicros, VOICE_PRODUCTS, voiceCostUsdMicros, type VoiceProduct } from "@forja/core";
 import { decryptSecret, endLiveSession, type FimDaSessao } from "@forja/core/server";
-import { and, chaveDoCofrePorId, consumeRateLimit, createGatewayStore, eq, getPricingSettings, inArray, lt, or, schema, sql, type Db } from "@forja/db";
+import { and, chaveDoSupabasePorId, consumeRateLimit, createGatewayStore, eq, getPricingSettings, inArray, lt, or, schema, sql, type Db } from "@forja/db";
 import { ASSISTANT_NAME, PERSONA_HEFESTO } from "./persona";
 
 export const VOZ_PRODUTO: VoiceProduct = VOICE_PRODUCTS["gpt-live-1"]!;
@@ -37,7 +37,7 @@ export async function precoMinutoBrlMicros(db: Db) {
 
 /** Há chave da OpenAI ativa para a voz em nuvem? */
 /**
- * A voz em nuvem só liga com VOZ_NUVEM_HABILITADA=1 (e uma chave da OpenAI no painel ou no Vault).
+ * A voz em nuvem só liga com VOZ_NUVEM_HABILITADA=1 (e a chave da OpenAI nos Secrets do Supabase).
  * No Hobby o cron roda 1 vez por dia; a varredura também roda a cada pulso e a cada abertura de
  * call (varrerSeForAVez). No Pro, volte o cron de apps/web/vercel.json para "* * * * *".
  */
@@ -128,12 +128,12 @@ export async function encerrarSessao(db: Db, sessao: Sessao, motivo: string, fim
     const chave = atual.providerKeyId
       ? await db.query.providerKeys.findFirst({ where: eq(schema.providerKeys.id, atual.providerKeyId) })
       : null;
-    // sem linha no painel: a call pode ter sido aberta com uma chave do Vault da Supabase
-    const doCofre = !chave && atual.providerKeyId ? await chaveDoCofrePorId(db, atual.providerKeyId) : null;
+    // sem linha no painel: a call foi aberta com a chave dos Secrets do Supabase
+    const doSupabase = !chave && atual.providerKeyId ? await chaveDoSupabasePorId(atual.providerKeyId) : null;
     const apiKey = chave
       ? decryptSecret(chave.encryptedKey)
-      : doCofre
-        ? doCofre.secret
+      : doSupabase
+        ? doSupabase.secret
         : atual.providerKeyId
           ? null
           : process.env.OPENAI_API_KEY;
