@@ -1,0 +1,27 @@
+{
+  "name": "forja",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Plataforma multi-modelo de IA para criação de sistemas, automação e gestão de projetos.",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev:web": "pnpm --filter @forja/web dev",
+    "dev:admin": "pnpm --filter @forja/admin dev",
+    "build": "pnpm --filter \"./apps/*\" build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:up": "docker compose up -d postgres",
+    "db:generate": "pnpm --filter @forja/db generate",
+    "db:migrate": "pnpm --filter @forja/db migrate",
+    "db:seed": "pnpm --filter @forja/db seed",
+    "gen:key": "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "typescript": "5.9.3"
+  }
+}
