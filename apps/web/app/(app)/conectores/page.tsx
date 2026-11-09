@@ -1,5 +1,7 @@
+import { instalacaoDaOrg } from "@forja/agent";
 import { desc, eq, schema } from "@forja/db";
-import { Badge, Button, Card, CardHeader, Field, inputClass, Notice, PageHeader } from "@forja/ui";
+import { Badge, Button, buttonClass, Card, CardHeader, Field, inputClass, Notice, PageHeader } from "@forja/ui";
+import Link from "next/link";
 import { CONNECTORS } from "@/lib/connectors";
 import { getSession } from "@/lib/session";
 import { connect, disconnect } from "./actions";
@@ -9,11 +11,10 @@ export const metadata = { title: "Conectores" };
 export default async function ConnectorsPage({ searchParams }: { searchParams: Promise<{ erro?: string; ok?: string }> }) {
   const { erro, ok } = await searchParams;
   const { db, org } = await getSession();
-  const connected = await db
-    .select()
-    .from(schema.connectors)
-    .where(eq(schema.connectors.orgId, org.id))
-    .orderBy(desc(schema.connectors.createdAt));
+  const [connected, instalacao] = await Promise.all([
+    db.select().from(schema.connectors).where(eq(schema.connectors.orgId, org.id)).orderBy(desc(schema.connectors.createdAt)),
+    instalacaoDaOrg(db, org.id),
+  ]);
 
   return (
     <>
@@ -29,6 +30,7 @@ export default async function ConnectorsPage({ searchParams }: { searchParams: P
       <div className="grid gap-4 md:grid-cols-2">
         {CONNECTORS.map((def) => {
           const mine = connected.filter((c) => c.type === def.type);
+          const ligado = def.type === "github" ? Boolean(instalacao) : mine.length > 0;
           return (
             <Card key={def.type}>
               <CardHeader
@@ -36,7 +38,7 @@ export default async function ConnectorsPage({ searchParams }: { searchParams: P
                 description={def.description}
                 actions={
                   def.available ? (
-                    mine.length ? <Badge tone="green">Conectado</Badge> : <Badge>Disponível</Badge>
+                    ligado ? <Badge tone="green">Conectado</Badge> : <Badge>Disponível</Badge>
                   ) : (
                     <Badge tone="amber">Em breve</Badge>
                   )
@@ -56,7 +58,20 @@ export default async function ConnectorsPage({ searchParams }: { searchParams: P
                     </form>
                   </div>
                 ))}
-                {def.available ? (
+                {def.href ? (
+                  instalacao ? (
+                    <p className="text-sm text-zinc-600">
+                      Conta <b>{instalacao.accountLogin}</b> ligada pelo app Forja Agentes.{" "}
+                      <Link href={def.href} className="font-medium underline">
+                        Gerenciar em Agente
+                      </Link>
+                    </p>
+                  ) : (
+                    <Link href={def.href} className={buttonClass("secondary", "sm")}>
+                      Conectar em Agente
+                    </Link>
+                  )
+                ) : def.available ? (
                   <form action={connect} className="flex flex-col gap-2 sm:flex-row sm:items-end">
                     <input type="hidden" name="type" value={def.type} />
                     <div className="flex-1">

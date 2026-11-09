@@ -1,8 +1,10 @@
+import { conectorDaOrg, migracoesDaTarefa, supabaseDaOrg } from "@forja/agent";
 import { and, asc, eq, schema, sql } from "@forja/db";
 import { buttonClass, PageHeader } from "@forja/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { canManage, getSession } from "@/lib/session";
+import { Entrega } from "./entrega";
 import { TarefaAoVivo } from "./tarefa-ao-vivo";
 
 export const metadata = { title: "Tarefa do agente" };
@@ -14,7 +16,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export default async function TarefaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!UUID.test(id)) notFound();
-  const { db, org } = await getSession();
+  const { db, org, role } = await getSession();
   const t = await db.query.agentTasks.findFirst({ where: and(eq(schema.agentTasks.id, id), eq(schema.agentTasks.orgId, org.id)) });
   if (!t) notFound();
   const [passos, [arquivos]] = await Promise.all([
@@ -33,6 +35,33 @@ export default async function TarefaPage({ params }: { params: Promise<{ id: str
       .limit(200),
     db.select({ n: sql<number>`count(*)::int` }).from(schema.agentTaskFiles).where(eq(schema.agentTaskFiles.taskId, t.id)),
   ]);
+
+  // entrega (depois do PR): preview na Vercel e migrações no Supabase
+  let entrega: Parameters<typeof Entrega>[0] | null = null;
+  if (t.prUrl) {
+    const [vercel, migracoes, supabase] = await Promise.all([conectorDaOrg(db, org.id, "vercel"), migracoesDaTarefa(db, t.id), supabaseDaOrg(db, org.id)]);
+    let projetos: Parameters<typeof Entrega>[0]["projetos"] = null;
+    let erroProjetos: string | null = null;
+    if (supabase && migracoes.length && canManage(role)) {
+      try {
+        projetos = await supabase.api.projetos();
+      } catch (e) {
+        erroProjetos = `Não consegui listar os projetos do Supabase: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    }
+    entrega = {
+      taskId: t.id,
+      preview: { estado: t.previewState, url: t.previewUrl, erro: t.previewError },
+      vercelConectada: Boolean(vercel),
+      migracoes: migracoes.map((m) => m.path),
+      supabaseConectado: Boolean(supabase),
+      projetos,
+      erroProjetos,
+      supabaseRef: t.supabaseProjectRef,
+      resultados: t.migrations ?? [],
+      podeGerenciar: canManage(role),
+    };
+  }
 
   return (
     <>
@@ -68,6 +97,11 @@ export default async function TarefaPage({ params }: { params: Promise<{ id: str
           passos,
         }}
       />
+      {entrega ? (
+        <div className="mt-6">
+          <Entrega {...entrega} />
+        </div>
+      ) : null}
     </>
   );
 }

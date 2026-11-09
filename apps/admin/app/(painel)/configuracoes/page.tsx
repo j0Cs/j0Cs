@@ -1,5 +1,6 @@
 import { formatBrl } from "@forja/core";
 import { getEconomics, getPricingSettings } from "@forja/db";
+import { metaDoCambio } from "@forja/ops";
 import { Button, Card, CardHeader, Field, inputClass, Notice, PageHeader } from "@forja/ui";
 import { adminDb } from "@/lib/admin";
 import { refreshFx, saveSettings } from "./actions";
@@ -9,7 +10,7 @@ export const metadata = { title: "Câmbio e taxas" };
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ ok?: string; erro?: string }> }) {
   const { ok, erro } = await searchParams;
   const db = await adminDb();
-  const [s, e] = await Promise.all([getPricingSettings(db), getEconomics(db)]);
+  const [s, e, fx] = await Promise.all([getPricingSettings(db), getEconomics(db), metaDoCambio(db)]);
   const multiplier = s.fxUsdBrl * (1 + s.costOverheadPercent / 100);
 
   return (
@@ -56,10 +57,17 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </Card>
 
         <Card>
-          <CardHeader title="Atualizar câmbio" description="Busca a PTAX de venda no Banco Central e aplica a folga." />
+          <CardHeader
+            title="Atualizar câmbio"
+            description={
+              fx.atualizadoEm
+                ? `A rotina diária busca a PTAX de venda e aplica a folga. Última: PTAX ${fx.ptax?.toFixed(4).replace(".", ",")} de ${fx.dataPtax ?? "?"}, atualizada em ${fx.atualizadoEm.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}.`
+                : "A rotina diária busca a PTAX de venda no Banco Central e aplica a folga. Ainda não rodou."
+            }
+          />
           <form action={refreshFx} className="space-y-4 p-5">
-            <Field label="Folga sobre a PTAX (%)">
-              <input name="buffer" defaultValue={3} className={inputClass} />
+            <Field label="Folga sobre a PTAX (%)" hint="Fica gravada: a rotina diária usa a mesma.">
+              <input name="buffer" defaultValue={fx.folga} className={inputClass} />
             </Field>
             <Button type="submit" variant="secondary" className="w-full">
               Buscar PTAX agora

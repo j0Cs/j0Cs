@@ -3,6 +3,7 @@
 import { formatBrlMicros } from "@forja/core";
 import { Badge, Button, Card, CardHeader, cx, Notice } from "@forja/ui";
 import { Check, ExternalLink, FileText, FolderTree, Pencil, Search, Square, Trash2, TriangleAlert, Brain } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { STATUS_DA_TAREFA } from "@/lib/agente-ui";
 import { aprovarTarefaAction, descartarTarefaAction, pararTarefaAction } from "../actions";
@@ -64,6 +65,7 @@ function iconeDoPasso(p: Passo) {
 }
 
 export function TarefaAoVivo({ inicial }: { inicial: { tarefa: Tarefa; passos: Passo[] } }) {
+  const router = useRouter();
   const [tarefa, setTarefa] = useState(inicial.tarefa);
   const [passos, setPassos] = useState(inicial.passos);
   const [diff, setDiff] = useState<ArquivoDoDiff[] | null>(null);
@@ -169,6 +171,8 @@ export function TarefaAoVivo({ inicial }: { inicial: { tarefa: Tarefa; passos: P
                     const r = await aprovarTarefaAction(tarefa.id);
                     if (r.erro) setErro(r.erro);
                     await atualizar(true);
+                    // mostra o cartão de entrega (preview e migrações)
+                    if (r.url) router.refresh();
                   })
                 }
               >
@@ -234,7 +238,7 @@ export function TarefaAoVivo({ inicial }: { inicial: { tarefa: Tarefa; passos: P
         <Card>
           <CardHeader
             title={`Mudanças (${diff.length} arquivo${diff.length > 1 ? "s" : ""})`}
-            description="Revise antes de aprovar. Nada foi escrito no GitHub ainda."
+            description={tarefa.prUrl ? "O que foi para o pull request." : "Revise antes de aprovar. Nada foi escrito no GitHub ainda."}
           />
           <ul className="divide-y divide-zinc-100">
             {diff.map((a) => (

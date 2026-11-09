@@ -21,6 +21,11 @@ const OUTROS = [
   "GITHUB_APP_CLIENT_ID",
   "GITHUB_APP_CLIENT_SECRET",
   "GITHUB_APP_PRIVATE_KEY",
+  // conciliação de custos (APIs de administração dos provedores)
+  "ANTHROPIC_ADMIN_KEY",
+  "ANTHROPIC_WORKSPACE_ID",
+  "OPENAI_ADMIN_KEY",
+  "OPENAI_PROJECT_ID",
 ];
 
 /** Chaves que autorizam a chamada: a service_role (legada) e as chaves secretas novas (sb_secret_). */

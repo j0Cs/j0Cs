@@ -1,6 +1,17 @@
 "use server";
 
-import { aprovarTarefa, criarTarefa, descartarTarefa, githubApp, pararTarefa, RegraDoAgente } from "@forja/agent";
+import {
+  aplicarMigracoes,
+  aprovarTarefa,
+  conectorDaOrg,
+  criarProjetoSupabase,
+  criarTarefa,
+  descartarTarefa,
+  githubApp,
+  pararTarefa,
+  publicarPreview,
+  RegraDoAgente,
+} from "@forja/agent";
 import { consumeRateLimit, eq, schema } from "@forja/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -30,6 +41,7 @@ export async function criarTarefaAction(_: FormState, f: FormData): Promise<Form
       modelId: String(f.get("modelo") ?? ""),
       tetoBrlMicros: reais(f.get("teto")),
       projectId: String(f.get("projeto") ?? "") || null,
+      conversationId: String(f.get("conversa") ?? "") || null,
     });
     id = tarefa.id;
   } catch (e) {
@@ -54,6 +66,14 @@ export async function aprovarTarefaAction(id: string): Promise<{ erro?: string; 
   if (!gh) return { erro: "O GitHub ainda não está configurado na Forja." };
   try {
     const pr = await aprovarTarefa(db, gh, org.id, id);
+    // Vercel conectada: o preview da branch do PR sai sozinho
+    if (await conectorDaOrg(db, org.id, "vercel")) {
+      after(() =>
+        publicarPreview(db, gh, org.id, id).catch((err) => {
+          if (!(err instanceof RegraDoAgente)) console.error(JSON.stringify({ level: "error", msg: "preview automático falhou", taskId: id, err: String(err) }));
+        }),
+      );
+    }
     revalidatePath(`/agente/${id}`);
     return { url: pr.url };
   } catch (e) {
@@ -77,4 +97,50 @@ export async function tetoDiarioAction(_: FormState, f: FormData): Promise<FormS
   await db.update(schema.organizations).set({ agentDailyCapBrlMicros: valor }).where(eq(schema.organizations.id, org.id));
   revalidatePath("/agente");
   return { ok: "Teto diário atualizado." };
+}
+
+export async function publicarPreviewAction(id: string): Promise<{ erro?: string }> {
+  const { db, org } = await getSession();
+  const gh = await githubApp();
+  if (!gh) return { erro: "O GitHub ainda não está configurado na Forja." };
+  if (!(await consumeRateLimit(db, `agente:preview:${org.id}`, 20, 3600))) return { erro: "Muitos previews na última hora. Tente mais tarde." };
+  try {
+    await publicarPreview(db, gh, org.id, id);
+    return {};
+  } catch (e) {
+    if (e instanceof RegraDoAgente) return { erro: e.message };
+    console.error(JSON.stringify({ level: "error", msg: "preview falhou", taskId: id, err: String(e) }));
+    return { erro: "Não consegui falar com a Vercel agora. Tente de novo." };
+  }
+}
+
+/** Criar banco e aplicar migrações mexem na conta do cliente: só donos e administradores. */
+export async function criarProjetoSupabaseAction(id: string, nome: string): Promise<{ erro?: string; ref?: string }> {
+  const { db, org, role } = await getSession();
+  if (!canManage(role)) return { erro: "Só donos e administradores criam projetos no Supabase." };
+  if (!(await consumeRateLimit(db, `agente:supabase-criar:${org.id}`, 5, 3600))) return { erro: "Muitos projetos criados na última hora." };
+  try {
+    const p = await criarProjetoSupabase(db, org.id, { nome, taskId: id });
+    revalidatePath(`/agente/${id}`);
+    return { ref: p.ref };
+  } catch (e) {
+    if (e instanceof RegraDoAgente) return { erro: e.message };
+    return { erro: "Não consegui criar o projeto no Supabase agora." };
+  }
+}
+
+export async function aplicarMigracoesAction(id: string, ref: string): Promise<{ erro?: string; resultados?: { path: string; ok: boolean; erro?: string }[] }> {
+  const { db, org, role } = await getSession();
+  if (!canManage(role)) return { erro: "Só donos e administradores aplicam migrações no banco." };
+  if (!/^[a-z0-9]{10,40}$/.test(ref)) return { erro: "Escolha um projeto do Supabase." };
+  if (!(await consumeRateLimit(db, `agente:migracoes:${org.id}`, 30, 3600))) return { erro: "Muitas tentativas na última hora." };
+  try {
+    const resultados = await aplicarMigracoes(db, org.id, id, ref);
+    revalidatePath(`/agente/${id}`);
+    return { resultados };
+  } catch (e) {
+    if (e instanceof RegraDoAgente) return { erro: e.message };
+    console.error(JSON.stringify({ level: "error", msg: "migrações falharam", taskId: id, err: String(e) }));
+    return { erro: "Não consegui falar com o Supabase agora." };
+  }
 }

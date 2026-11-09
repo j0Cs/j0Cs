@@ -6,4 +6,4 @@ export * from "./queries";
 export * from "./ratelimit";
 export * as schema from "./schema";
 export * from "./store";
-export { and, asc, desc, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
+export { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";

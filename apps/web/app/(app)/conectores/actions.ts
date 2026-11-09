@@ -12,7 +12,7 @@ export async function connect(formData: FormData) {
   if (!canManage(role)) redirect(`/conectores?erro=${encodeURIComponent("Só donos e administradores gerenciam conectores.")}`);
   const type = String(formData.get("type")) as ConnectorType;
   const credential = String(formData.get("credential") ?? "").trim();
-  const def = CONNECTORS.find((c) => c.type === type && c.available);
+  const def = CONNECTORS.find((c) => c.type === type && c.available && !c.href);
   if (!def || !credential) redirect(`/conectores?erro=${encodeURIComponent("Preencha a credencial.")}`);
 
   const result = await verifyConnector(type, credential);
@@ -24,7 +24,7 @@ export async function connect(formData: FormData) {
     name: result.account ? `${def.name} · ${result.account}` : def.name,
     encryptedCredentials: encryptSecret(credential),
     credentialHint: secretHint(credential),
-    metadata: { account: result.account ?? null, verifiedAt: new Date().toISOString() },
+    metadata: { ...result.metadata, account: result.account ?? null, verifiedAt: new Date().toISOString() },
   });
   revalidatePath("/conectores");
   redirect("/conectores?ok=1");

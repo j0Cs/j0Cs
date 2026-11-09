@@ -15,6 +15,7 @@
     "@forja/billing": "workspace:*",
     "@forja/core": "workspace:*",
     "@forja/db": "workspace:*",
+    "@forja/ops": "workspace:*",
     "@forja/ui": "workspace:*",
     "better-auth": "^1.7.16",
     "lucide-react": "^1.68.0",

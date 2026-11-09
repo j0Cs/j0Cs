@@ -112,17 +112,17 @@ openssl rand -base64 32
 | Variável | web | admin | Observação |
 |---|---|---|---|
 | `DATABASE_URL`, `DATABASE_URL_DIRECT`, `DATABASE_SSL_CA` | ✔ | ✔ | passo 2 |
-| `ENCRYPTION_KEY` | ✔ | ✔ | **o mesmo valor** nos dois (o painel cifra as chaves de API, o app decifra) |
-| `BETTER_AUTH_SECRET` | ✔ | ✔ | um valor diferente em cada app |
-| `CRON_SECRET` | ✔ | | a Vercel manda no cabeçalho da varredura das chamadas de voz |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | | ✔ | conta inicial do painel, criada pelo seed. Troque a senha depois |
+| `ENCRYPTION_KEY` (e `ENCRYPTION_KEY_2`, `_3`… depois de uma rotação) | ✔ | ✔ | **o mesmo valor** nos dois (o painel cifra as chaves de API, o app decifra). Rotação: doc 10 |
+| `BETTER_AUTH_SECRET` (e `BETTER_AUTH_SECRETS` depois de uma rotação) | ✔ | ✔ | um valor diferente em cada app. Rotação: doc 10 |
+| `CRON_SECRET` | ✔ | | a Vercel manda no cabeçalho dos crons (voz e rotina diária) |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | | ✔ | conta inicial do painel, criada pelo seed. Troque a senha em Backup e chaves e apague `ADMIN_PASSWORD` |
 | `ADMIN_IP_ALLOWLIST` | | opcional | IPs liberados no painel, separados por vírgula |
 | `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `EMAIL_FROM` | ✔ | ✔ | doc 5 / `cowork/02-microsoft-365-email.md` |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | ✔ | | `cowork/01-github-login.md` |
 | `STRIPE_SECRET_KEY` | ✔ | ✔ | doc 8 (o painel usa para reembolsar) |
 | `STRIPE_WEBHOOK_SECRET` | ✔ | | doc 8 (assinatura do webhook `/api/stripe/webhook`) |
 | `WEB_URL` / `ADMIN_URL` | opcional | opcional | sem elas, cada app usa o próprio domínio de produção da Vercel (`VERCEL_PROJECT_PRODUCTION_URL`), que passa a ser o domínio próprio quando você ligar um. Se um app tiver **mais de um** domínio próprio, defina a variável com o endereço canônico (o mesmo do callback do GitHub): a Vercel escolhe o domínio mais curto |
-| `ANTHROPIC_API_KEY` etc. | | | **não**: as chaves dos provedores são cadastradas no painel e ficam cifradas no banco |
+| `ANTHROPIC_API_KEY` etc. | | | **não**: as chaves dos provedores, as de admin (conciliação) e as do GitHub App ficam nos **Secrets do Supabase** (Edge Functions → Secrets) e chegam pela função `forja-chaves`. Chaves extras podem ser cadastradas no painel, cifradas no banco |
 
    Marque só **Production** nos segredos do banco. Builds de *preview* (cada push numa branch) **não** migram nem
    rodam o seed (`VERCEL_ENV` diferente de `production`), então um preview nunca altera o banco de produção.

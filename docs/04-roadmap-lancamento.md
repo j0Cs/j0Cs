@@ -103,17 +103,31 @@ custo da tarefa mostrado e abaixo do teto.
 
 Objetivo: o código do agente sai do PR e vira um site no ar, e o dono enxerga problema antes do cliente.
 
-- [ ] **[Claude]** Conector **Vercel**: criar o projeto a partir do repositório, preview a cada PR, link no chat
-- [ ] **[Claude]** Conector **Supabase**: criar projeto e banco, rodar as migrações geradas pelo agente
-- [ ] **[Claude]** Conciliação de custos: comparar o uso registrado com o relatório de cada provedor e alertar
+> **Adiantada em 09/11**: código pronto e testado com Vercel, Supabase e GitHub simulados e um Postgres de verdade
+> fazendo o papel do banco do cliente (docs 9 e 10). Falta, do seu lado:
+> - criar o GitHub App (Sprint 3);
+> - ligar o backup no GitHub (`docs/cowork/04-backup.md`);
+> - trocar os segredos que passaram pela conversa (doc 10).
+
+- [x] **[Claude]** Conector **Vercel**: cria o projeto a partir do repositório (framework detectado), publica o preview da
+  branch de cada PR e manda o link para a conversa
+- [x] **[Claude]** Conector **Supabase**: cria projeto e banco (São Paulo) e aplica as migrações do agente, com
+  confirmação, uma de cada vez e no histórico do Supabase CLI
+- [x] **[Claude]** "Enviar ao agente" no chat: a conversa vira o pedido, e os links do PR e do preview voltam para ela
+- [x] **[Claude]** Conciliação de custos: compara o uso registrado com o relatório da Anthropic e da OpenAI e alerta
   diferença acima de 2%
-- [ ] **[Claude]** Alertas para o dono: cliente com margem negativa, chave falhando, provedor com erro acima de 2%,
-  câmbio desatualizado (com atualização diária da PTAX)
-- [ ] **[Claude]** Backup diário fora da Supabase e um teste de restauração de verdade; plano de incidente (chave
-  vazada = rotacionada em 15 minutos)
+- [x] **[Claude]** Alertas para o dono: cliente com margem negativa, chave falhando, provedor com erro acima de 2%,
+  câmbio desatualizado (com atualização diária da PTAX) e backup; e-mail para a equipe e alerta de teste
+- [x] **[Claude]** Backup diário fora da Supabase (GitHub Actions, cifrado) com restauração de teste todo dia; teste
+  de restauração de verdade feito; plano de incidente (doc 10)
+- [ ] **[Você]** Ligar o backup: chaves e acesso gerados no painel, uma variável e um secret no GitHub
+  (`docs/cowork/04-backup.md`). O agendamento começa quando o PR entrar na `main`
+- [x] **[Claude]** Rotação da `ENCRYPTION_KEY` sem precisar ler a antiga (chaves numeradas + Recifrar no painel),
+  troca de senha do painel e gerador de segredos no navegador
+- [ ] **[Você]** Trocar os segredos que passaram pela conversa (doc 10, uns 20 minutos)
+- [x] **[Claude]** Revisão de segurança final
 - [ ] **[Você]** Plano **Pro** da Vercel (US$ 20/mês). **[Claude]** volta a varredura das calls para cada minuto,
   liga `VOZ_NUVEM_HABILITADA` e faz o primeiro teste da voz em nuvem com a chave real da OpenAI
-- [ ] **[Claude]** Segredos novos de produção (os atuais passaram pela conversa) e revisão de segurança final
 
 Pronto quando: do chat, o agente abre o PR, a Vercel publica o preview e o link aparece na conversa; um alerta de
 teste chega ao dono por e-mail; o backup é restaurado num banco separado.

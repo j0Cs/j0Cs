@@ -542,6 +542,20 @@ export const agentTasks = pgTable(
     prUrl: text("pr_url"),
     prNumber: integer("pr_number"),
     stopRequested: boolean("stop_requested").notNull().default(false),
+    /** Conversa de onde a tarefa saiu (os links de PR e preview voltam para ela). */
+    conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+    /** Vercel: projeto ligado ao repositório e o preview da branch do PR. */
+    vercelProjectId: text("vercel_project_id"),
+    vercelDeploymentId: text("vercel_deployment_id"),
+    previewUrl: text("preview_url"),
+    /** BUILDING | READY | ERROR | CANCELED */
+    previewState: text("preview_state"),
+    /** Por que o preview não saiu (falta de conector, Vercel sem acesso ao repositório, build com erro). */
+    previewError: text("preview_error"),
+    previewNotified: boolean("preview_notified").notNull().default(false),
+    /** Supabase: projeto onde as migrações do PR foram aplicadas e o resultado de cada uma. */
+    supabaseProjectRef: text("supabase_project_ref"),
+    migrations: jsonb("migrations").$type<{ path: string; ok: boolean; erro?: string; em: string }[]>(),
     /** Quem está executando e até quando (evita dois executores na mesma tarefa). */
     runnerUntil: timestamp("runner_until", { withTimezone: true }),
     createdAt: createdAt(),
@@ -580,4 +594,50 @@ export const agentTaskFiles = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [primaryKey({ columns: [t.taskId, t.path] })],
+);
+
+// ---------------------------------------------------------------------------
+// Operação (Sprint 4): alertas do dono e conciliação de custos
+// ---------------------------------------------------------------------------
+
+/** Alertas para a equipe da plataforma (e-mail + tela Alertas do painel). */
+export const ownerAlerts = pgTable(
+  "owner_alerts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** margem | chave | provedor | cambio | conciliacao | backup | teste */
+    kind: text("kind").notNull(),
+    /** aviso | critico */
+    severity: text("severity").notNull().default("aviso"),
+    title: text("title").notNull(),
+    detail: text("detail").notNull().default(""),
+    /** Mesmo problema aberto = um alerta só. */
+    dedupeKey: text("dedupe_key").notNull(),
+    createdAt: createdAt(),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("owner_alerts_aberto_unico").on(t.dedupeKey).where(sql`${t.resolvedAt} is null`),
+    index("owner_alerts_created_idx").on(t.createdAt),
+  ],
+);
+
+/** Custo registrado pela Forja x relatório do provedor, por dia (UTC). */
+export const costReconciliations = pgTable(
+  "cost_reconciliations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** AAAA-MM-DD (UTC) */
+    day: text("day").notNull(),
+    providerId: providerIdEnum("provider_id").notNull(),
+    recordedUsdMicros: money("recorded_usd_micros"),
+    reportedUsdMicros: bigint("reported_usd_micros", { mode: "number" }),
+    diffPercent: integer("diff_percent_x100"),
+    /** ok | divergente | sem_relatorio | erro */
+    status: text("status").notNull(),
+    detail: text("detail").notNull().default(""),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("cost_reconciliations_dia_provedor").on(t.day, t.providerId)],
 );

@@ -29,6 +29,9 @@ importers:
       '@forja/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@forja/ops':
+        specifier: workspace:*
+        version: link:../../packages/ops
       '@forja/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -90,6 +93,9 @@ importers:
       '@forja/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@forja/ops':
+        specifier: workspace:*
+        version: link:../../packages/ops
       '@forja/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -294,6 +300,37 @@ importers:
       typescript:
         specifier: 5.9.3
         version: 5.9.3
+
+  packages/ops:
+    dependencies:
+      '@forja/auth':
+        specifier: workspace:*
+        version: link:../auth
+      '@forja/core':
+        specifier: workspace:*
+        version: link:../core
+      '@forja/db':
+        specifier: workspace:*
+        version: link:../db
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.0
+        version: 22.20.5
+      '@types/pg':
+        specifier: ^8.15.0
+        version: 8.23.1
+      pg:
+        specifier: ^8.23.1
+        version: 8.23.1
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
 
   packages/ui:
     dependencies:

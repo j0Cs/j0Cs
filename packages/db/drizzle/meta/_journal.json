@@ -50,6 +50,13 @@
       "when": 1794225994447,
       "tag": "0006_agente_github",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794228390313,
+      "tag": "0007_operacao",
+      "breakpoints": true
     }
   ]
 }

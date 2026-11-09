@@ -4,6 +4,6 @@
   "buildCommand": "pnpm --filter @forja/db migrate && next build",
   "crons": [
     { "path": "/api/cron/voz", "schedule": "17 6 * * *" },
-    { "path": "/api/cron/cobranca", "schedule": "23 9 * * *" }
+    { "path": "/api/cron/diario", "schedule": "23 9 * * *" }
   ]
 }

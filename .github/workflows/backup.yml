@@ -1,0 +1,78 @@
+# Backup diário da Forja, fora do Supabase (doc 10).
+# Copia o banco de produção, restaura num Postgres separado para provar que a cópia funciona e
+# guarda a cópia cifrada com a chave pública do dono (só a chave privada dele abre).
+# Configuração (uma vez): secret BACKUP_DATABASE_URL e variável BACKUP_AGE_RECIPIENT.
+name: Backup diário
+
+on:
+  schedule:
+    - cron: "47 6 * * *" # 03:47 em Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      restauracao:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: restauracao-de-teste
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    # A URL do banco (secret) entra só nos passos que a usam, nunca nas actions de terceiros.
+    env:
+      AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+      DESTINO_TESTE_URL: postgres://postgres:restauracao-de-teste@localhost:5432/postgres
+      CONFIGURADO: ${{ secrets.BACKUP_DATABASE_URL != '' && vars.BACKUP_AGE_RECIPIENT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Conferir a configuração
+        run: |
+          if [ "$CONFIGURADO" != "true" ]; then
+            echo "::error::Configure o secret BACKUP_DATABASE_URL e a variável BACKUP_AGE_RECIPIENT (doc 10)."
+            exit 1
+          fi
+
+      - name: Instalar o Postgres 17 (cliente) e o age
+        run: |
+          sudo apt-get install -y -qq postgresql-common > /dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y > /dev/null
+          sudo apt-get install -y -qq postgresql-client-17 age > /dev/null
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Backup e restauração de teste
+        env:
+          ORIGEM_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: bash ops/backup/backup.sh saida
+
+      - name: Guardar a cópia cifrada (30 dias)
+        uses: actions/upload-artifact@v4
+        with:
+          name: forja-backup-${{ github.run_id }}
+          path: |
+            saida/*.dump.age
+            saida/*.sha256
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Registrar o resultado na Forja
+        if: always() && env.CONFIGURADO == 'true'
+        env:
+          ORIGEM_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: bash ops/backup/registrar.sh "${{ job.status }}" saida "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

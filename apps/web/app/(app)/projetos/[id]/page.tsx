@@ -1,6 +1,7 @@
+import { atualizarPreviewsDaConversa } from "@forja/agent";
 import { and, asc, desc, eq, schema } from "@forja/db";
 import { Badge, buttonClass, cx } from "@forja/ui";
-import { FolderGit2, Plus } from "lucide-react";
+import { Bot, FolderGit2, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { defaultModelFor, listModelOptions } from "@/lib/models";
@@ -35,6 +36,8 @@ export default async function ProjectPage({
   ]);
 
   const active = c ? conversations.find((x) => x.id === c) : undefined;
+  // previews do agente que ainda estavam sendo publicados: o aviso entra na conversa antes de ler
+  if (active) await atualizarPreviewsDaConversa(db, org.id, active.id).catch(() => undefined);
   const rows = active
     ? await db
         .select({ message: schema.messages, usage: schema.usageEvents })
@@ -70,10 +73,21 @@ export default async function ProjectPage({
             {project.instructions ? <Badge>Instruções do projeto ativas</Badge> : null}
           </div>
         </div>
-        <form action={archiveProject}>
-          <input type="hidden" name="id" value={project.id} />
-          <button className={buttonClass("ghost", "sm")}>Arquivar projeto</button>
-        </form>
+        <div className="flex flex-wrap items-center gap-2">
+          {active ? (
+            <Link
+              href={`/agente/nova?conversa=${active.id}`}
+              className={buttonClass("secondary", "sm")}
+              title="O agente implementa no GitHub o que foi combinado nesta conversa e abre um PR"
+            >
+              <Bot size={14} /> Enviar ao agente
+            </Link>
+          ) : null}
+          <form action={archiveProject}>
+            <input type="hidden" name="id" value={project.id} />
+            <button className={buttonClass("ghost", "sm")}>Arquivar projeto</button>
+          </form>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">

@@ -274,8 +274,13 @@ export class GithubApp {
 
 // ---- estado assinado do fluxo de instalação ----
 
+/**
+ * Segredo atual do app: a 1ª entrada de BETTER_AUTH_SECRETS ("2:valor,1:valor") quando houver
+ * rotação (doc 10), senão BETTER_AUTH_SECRET.
+ */
 function segredoDoEstado() {
-  const s = process.env.BETTER_AUTH_SECRET;
+  const atual = process.env.BETTER_AUTH_SECRETS?.split(",")[0]?.trim();
+  const s = (atual && atual.includes(":") ? atual.slice(atual.indexOf(":") + 1).trim() : "") || process.env.BETTER_AUTH_SECRET;
   if (!s) throw new Error("BETTER_AUTH_SECRET não definido.");
   return s;
 }

@@ -32,3 +32,50 @@ describe("encryptSecret", () => {
     expect(secretHint("sk-abcdef1234")).toBe("••••1234");
   });
 });
+
+describe("chaves numeradas (rotação sem ler a chave antiga)", () => {
+  const k1 = randomBytes(32).toString("base64");
+  const k2 = randomBytes(32).toString("base64");
+  const comAmbiente = <T>(env: Record<string, string | undefined>, fn: () => T): T => {
+    const antes = { ...process.env };
+    for (const n of ["ENCRYPTION_KEY", "ENCRYPTION_KEY_2", "ENCRYPTION_KEY_3"]) delete process.env[n];
+    Object.assign(process.env, env);
+    try {
+      return fn();
+    } finally {
+      for (const n of ["ENCRYPTION_KEY", "ENCRYPTION_KEY_2", "ENCRYPTION_KEY_3"]) delete process.env[n];
+      Object.assign(process.env, antes);
+    }
+  };
+
+  it("cifra com a maior chave presente e decifra pela chave do prefixo", async () => {
+    const { chaveAtiva, chaveDoValor } = await import("../src/crypto");
+    const antigo = comAmbiente({ ENCRYPTION_KEY: k1 }, () => encryptSecret("segredo-antigo"));
+    expect(antigo.startsWith("v1.")).toBe(true);
+    comAmbiente({ ENCRYPTION_KEY: k1, ENCRYPTION_KEY_2: k2 }, () => {
+      expect(chaveAtiva()).toBe(2);
+      const novo = encryptSecret("segredo-novo");
+      expect(novo.startsWith("k2.")).toBe(true);
+      expect(chaveDoValor(novo)).toBe(2);
+      expect(decryptSecret(antigo)).toBe("segredo-antigo");
+      expect(decryptSecret(novo)).toBe("segredo-novo");
+    });
+  });
+
+  it("depois de apagar a chave antiga, o valor antigo dá erro claro", () => {
+    const antigo = comAmbiente({ ENCRYPTION_KEY: k1 }, () => encryptSecret("x"));
+    comAmbiente({ ENCRYPTION_KEY_2: k2 }, () => {
+      expect(() => decryptSecret(antigo)).toThrow(/ENCRYPTION_KEY, que não está mais configurada/);
+    });
+  });
+
+  it("impressão digital não revela a chave", async () => {
+    const { digitalDaChave } = await import("../src/crypto");
+    comAmbiente({ ENCRYPTION_KEY: k1 }, () => {
+      const d = digitalDaChave(1)!;
+      expect(d).toMatch(/^[0-9a-f]{8}$/);
+      expect(k1).not.toContain(d);
+      expect(digitalDaChave(2)).toBeNull();
+    });
+  });
+});

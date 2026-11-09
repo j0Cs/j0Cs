@@ -9,31 +9,34 @@ export interface ConnectorDefinition {
   credentialLabel: string;
   credentialHint: string;
   available: boolean;
+  /** Conectado em outra tela (sem formulário de token aqui). */
+  href?: string;
 }
 
 export const CONNECTORS: ConnectorDefinition[] = [
   {
     type: "github",
     name: "GitHub",
-    description: "Repositórios, branches e pull requests criados pelos agentes.",
-    credentialLabel: "Token de acesso (fine-grained)",
-    credentialHint: "GitHub → Settings → Developer settings → Fine-grained tokens. Na Sprint 3 vira GitHub App (1 clique).",
+    description: "Repositórios e pull requests do agente. A conexão é pelo app Forja Agentes, em Agente.",
+    credentialLabel: "",
+    credentialHint: "",
     available: true,
+    href: "/agente",
   },
   {
     type: "vercel",
     name: "Vercel",
-    description: "Deploy de previews e produção dos sistemas criados.",
+    description: "Preview de cada pull request do agente, com o link na conversa. O projeto é criado sozinho a partir do repositório.",
     credentialLabel: "Token da Vercel",
-    credentialHint: "vercel.com → Account Settings → Tokens.",
+    credentialHint: "vercel.com → Account Settings → Tokens → Create (escopo: o time dos seus projetos). Na Vercel, instale também o app do GitHub com acesso aos repositórios.",
     available: true,
   },
   {
     type: "supabase",
     name: "Supabase",
-    description: "Banco Postgres, autenticação e storage dos seus projetos.",
+    description: "Cria o banco do projeto e aplica as migrações que o agente escreveu, depois da sua confirmação.",
     credentialLabel: "Access token (Management API)",
-    credentialHint: "supabase.com/dashboard/account/tokens.",
+    credentialHint: "supabase.com/dashboard/account/tokens → Generate new token.",
     available: true,
   },
   {
@@ -66,6 +69,8 @@ export interface VerifyResult {
   ok: boolean;
   account?: string;
   error?: string;
+  /** Guardado no conector (ex.: o time padrão da Vercel). */
+  metadata?: Record<string, unknown>;
 }
 
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0|\[?::1\]?$|169\.254\.)/i;
@@ -83,13 +88,13 @@ export async function verifyConnector(type: ConnectorType, credential: string): 
         return { ok: true, account: body.login };
       }
       case "vercel": {
-        const res = await fetch("https://api.vercel.com/v2/user", { headers: { authorization: `Bearer ${credential}` } });
+        const res = await fetch(`${(process.env.VERCEL_API_BASE || "https://api.vercel.com").replace(/\/+$/, "")}/v2/user`, { headers: { authorization: `Bearer ${credential}` } });
         if (!res.ok) return { ok: false, error: `Vercel recusou o token (${res.status}).` };
-        const body = (await res.json()) as { user?: { username?: string; email?: string } };
-        return { ok: true, account: body.user?.username ?? body.user?.email };
+        const body = (await res.json()) as { user?: { username?: string; email?: string; defaultTeamId?: string | null } };
+        return { ok: true, account: body.user?.username ?? body.user?.email, metadata: { teamId: body.user?.defaultTeamId ?? null } };
       }
       case "supabase": {
-        const res = await fetch("https://api.supabase.com/v1/projects", { headers: { authorization: `Bearer ${credential}` } });
+        const res = await fetch(`${(process.env.SUPABASE_API_BASE || "https://api.supabase.com").replace(/\/+$/, "")}/v1/projects`, { headers: { authorization: `Bearer ${credential}` } });
         if (!res.ok) return { ok: false, error: `Supabase recusou o token (${res.status}).` };
         const body = (await res.json()) as unknown[];
         return { ok: true, account: `${body.length} projeto(s)` };

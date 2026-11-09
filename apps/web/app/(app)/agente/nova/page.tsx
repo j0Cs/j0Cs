@@ -1,4 +1,4 @@
-import { githubApp, instalacaoDaOrg, LIMITES } from "@forja/agent";
+import { githubApp, instalacaoDaOrg, LIMITES, pedidoDaConversa } from "@forja/agent";
 import { and, eq, schema } from "@forja/db";
 import { buttonClass, Card, Field, inputClass, Notice, PageHeader } from "@forja/ui";
 import Link from "next/link";
@@ -14,8 +14,8 @@ export const maxDuration = 300;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default async function NovaTarefaPage({ searchParams }: { searchParams: Promise<{ projeto?: string }> }) {
-  const { projeto } = await searchParams;
+export default async function NovaTarefaPage({ searchParams }: { searchParams: Promise<{ projeto?: string; conversa?: string }> }) {
+  const { projeto, conversa } = await searchParams;
   const { db, org, plan } = await getSession();
   const instalacao = await instalacaoDaOrg(db, org.id);
   if (!instalacao) {
@@ -36,9 +36,11 @@ export default async function NovaTarefaPage({ searchParams }: { searchParams: P
     projeto && UUID.test(projeto)
       ? await db.query.projects.findFirst({ where: and(eq(schema.projects.id, projeto), eq(schema.projects.orgId, org.id)) })
       : undefined;
+  const daConversa = !projetoDaCall && conversa && UUID.test(conversa) ? await pedidoDaConversa(db, org.id, conversa) : null;
   const pedidoInicial = projetoDaCall?.instructions
     ? `Crie a primeira versão do projeto "${projetoDaCall.name}" conforme esta especificação (combinada na call):\n\n${projetoDaCall.instructions}`
-    : "";
+    : (daConversa?.pedido ?? "");
+  const repoSugerido = daConversa?.projeto?.repoFullName ?? projetoDaCall?.repoFullName ?? null;
 
   const gh = await githubApp();
   let repos: { fullName: string; private: boolean }[] = [];
@@ -73,6 +75,20 @@ export default async function NovaTarefaPage({ searchParams }: { searchParams: P
           </Notice>
         </div>
       ) : null}
+      {daConversa ? (
+        <div className="mb-4">
+          <Notice tone="blue">
+            O pedido traz a conversa <b>{daConversa.conversa.title}</b>
+            {daConversa.projeto ? (
+              <>
+                {" "}
+                do projeto <b>{daConversa.projeto.name}</b>
+              </>
+            ) : null}
+            . Os links do PR e do preview voltam para ela. Ajuste o pedido se quiser.
+          </Notice>
+        </div>
+      ) : null}
       {erroRepos ? (
         <div className="mb-4">
           <Notice tone="red">{erroRepos}</Notice>
@@ -89,8 +105,14 @@ export default async function NovaTarefaPage({ searchParams }: { searchParams: P
       <Card className="max-w-3xl p-6">
         <ActionForm action={criarTarefaAction} submit="Criar tarefa e começar" pending="Preparando o repositório…" variant="brand">
           {projetoDaCall ? <input type="hidden" name="projeto" value={projetoDaCall.id} /> : null}
+          {daConversa ? <input type="hidden" name="conversa" value={daConversa.conversa.id} /> : null}
           <Field label="Repositório">
-            <select name="repo" required className={inputClass} defaultValue={repos[0]?.fullName}>
+            <select
+              name="repo"
+              required
+              className={inputClass}
+              defaultValue={repos.find((r) => r.fullName.toLowerCase() === repoSugerido?.toLowerCase())?.fullName ?? repos[0]?.fullName}
+            >
               {repos.map((r) => (
                 <option key={r.fullName} value={r.fullName}>
                   {r.fullName}

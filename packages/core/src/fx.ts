@@ -10,7 +10,7 @@ export async function fetchPtaxUsdBrl(today = new Date()): Promise<{ rate: numbe
     const url =
       "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/" +
       `CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='${mmddyyyy}'&$format=json`;
-    const res = await fetch(url, { headers: { accept: "application/json" } });
+    const res = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) throw new Error(`PTAX respondeu ${res.status}`);
     const body = (await res.json()) as { value?: { cotacaoVenda: number; dataHoraCotacao: string }[] };
     const last = body.value?.at(-1);

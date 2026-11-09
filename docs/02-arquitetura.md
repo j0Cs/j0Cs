@@ -97,8 +97,9 @@ Regras que estão no código e cobertas por testes (`packages/core/test`):
 ## Segurança
 
 1. **Chaves e credenciais criptografadas em repouso** com AES-256-GCM (`packages/core/src/crypto.ts`). O banco guarda só o texto cifrado
-   e os 4 últimos caracteres. A chave mestra (`ENCRYPTION_KEY`) fica no cofre de variáveis da hospedagem; o prefixo `v1.`
-   permite migrar para KMS (AWS/GCP) sem reescrever dados.
+   e os 4 últimos caracteres. A chave mestra (`ENCRYPTION_KEY`) fica no cofre de variáveis da hospedagem. O prefixo de cada valor
+   (`v1.`, `k2.`, `k3.`…) diz qual chave o cifrou. Assim a chave troca sem ler a antiga (doc 10), e o mesmo prefixo
+   permite migrar para KMS.
 2. **Chaves testadas antes de salvar** (listagem de modelos, que é gratuita) e nunca devolvidas para a tela.
 3. **Painel do dono isolado**: deploy, domínio e cookie separados; cadastro desativado (só contas "staff" criadas pelo
    seed); **2FA obrigatório** antes de qualquer tela; allowlist de IP opcional; toda página e server action chama

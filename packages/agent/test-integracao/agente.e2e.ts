@@ -7,9 +7,10 @@
  *
  *   pnpm --filter @forja/agent test:integracao
  */
-import { generateKeyPairSync } from "node:crypto";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import pg from "pg";
+import { iniciarSupabaseSimulado, iniciarVercelSimulada } from "./entrega-simulada";
 import { iniciarGithubSimulado } from "./github-simulado";
 
 const base = process.env.DATABASE_URL;
@@ -21,7 +22,14 @@ const admin = new pg.Client({ connectionString: base });
 await admin.connect();
 await admin.query(`drop database if exists ${NOME} with (force)`);
 await admin.query(`create database ${NOME}`);
+// bancos "do cliente" no Supabase simulado (um por projeto)
+const BANCOS_DO_CLIENTE = ["forja_teste_cliente_a", "forja_teste_cliente_b"];
+for (const b of BANCOS_DO_CLIENTE) {
+  await admin.query(`drop database if exists ${b} with (force)`);
+  await admin.query(`create database ${b}`);
+}
 await admin.end();
+const urlDoBanco = (nome: string) => Object.assign(new URL(base), { pathname: `/${nome}` }).toString();
 u.pathname = `/${NOME}`;
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
@@ -56,6 +64,12 @@ process.env.GITHUB_APP_PRIVATE_KEY = privateKey.export({ type: "pkcs1", format: 
 process.env.GITHUB_APP_CLIENT_ID = "Iv1.teste";
 process.env.GITHUB_APP_CLIENT_SECRET = "segredo-oauth";
 process.env.GITHUB_API_BASE = gh$.url;
+const vercel$ = await iniciarVercelSimulada(12302);
+const REF_A = "abcdefghijklmnopqrst";
+const supabase$ = await iniciarSupabaseSimulado(12303, { [REF_A]: urlDoBanco(BANCOS_DO_CLIENTE[0]!) }, urlDoBanco(BANCOS_DO_CLIENTE[1]!));
+process.env.VERCEL_API_BASE = vercel$.url;
+process.env.SUPABASE_API_BASE = supabase$.url;
+process.env.ENCRYPTION_KEY = randomBytes(32).toString("base64");
 process.env.GITHUB_WEB_BASE = gh$.url;
 delete process.env.SUPABASE_URL;
 delete process.env.SUPABASE_SECRET_KEY;
@@ -265,6 +279,146 @@ ok(
   "modelo sem ferramentas: recusado na criação com mensagem clara",
 );
 
+// ---------------------------------------------------------------- 7. entrega: conversa → tarefa → PR → preview → migrações
+const { encryptSecret, decryptSecret } = await import("@forja/core/server");
+const [projetoChat] = await db.insert(schema.projects).values({ orgId: org0.id, name: "Lista de tarefas", repoFullName: "cliente-teste/site" } as never).returning();
+const [conversa] = await db
+  .insert(schema.conversations)
+  .values({ orgId: org0.id, projectId: projetoChat!.id, title: "Lista de tarefas com banco", modelId: "claude-sonnet-5-5", createdBy: dono!.id })
+  .returning();
+await db.insert(schema.messages).values([
+  { conversationId: conversa!.id, role: "user", content: "Quero uma página com a lista de tarefas, salvando no banco." },
+  { conversationId: conversa!.id, role: "assistant", content: "Combinado: tabela tarefas (titulo, feita) com RLS e uma página /tarefas." },
+]);
+const mensagens = async () =>
+  (await db.select().from(schema.messages).where(eq(schema.messages.conversationId, conversa!.id)).orderBy(schema.messages.createdAt)).map((m) => m.content);
+
+const doChat = await a.pedidoDaConversa(db, org0.id, conversa!.id);
+ok(Boolean(doChat?.pedido.includes("lista de tarefas, salvando no banco") && doChat.pedido.includes("Combinado: tabela tarefas")), "pedido montado a partir da conversa");
+ok(doChat?.projeto?.repoFullName === "cliente-teste/site", "o repositório do projeto vem sugerido");
+ok((await a.pedidoDaConversa(db, "00000000-0000-4000-8000-000000000000", conversa!.id)) === null, "conversa de outra organização não é lida");
+ok(
+  (await espera(async () => a.criarTarefa(db, gh, { org: await lerOrg(), userId: dono!.id, repoFullName: "cliente-teste/site", pedido: doChat!.pedido, modelId: "claude-sonnet-5-5", conversationId: "00000000-0000-4000-8000-000000000000" }), /Conversa não encontrada/)) === "ok",
+  "conversa inexistente: recusada",
+);
+const { tarefa: tc } = await a.criarTarefa(db, gh, { org: await lerOrg(), userId: dono!.id, repoFullName: "cliente-teste/site", pedido: doChat!.pedido, modelId: "claude-sonnet-5-5", conversationId: conversa!.id });
+ok(tc.conversationId === conversa!.id && tc.projectId === projetoChat!.id, "tarefa ligada à conversa e ao projeto");
+ok((await mensagens()).some((m) => m.includes("Mandei para o agente") && m.includes(`/agente/${tc.id}`)), "a conversa recebe o link da tarefa");
+
+const MIG1 = "create table public.tarefas (id bigint generated always as identity primary key, titulo text not null, feita boolean not null default false);\nalter table public.tarefas enable row level security;\ncreate policy \"leitura\" on public.tarefas for select using (true);\n";
+const MIG2 = "create index tarefas_feita_idx on public.tarefas (feita);\ncreate table public.etiquetas (id bigint generated always as identity primary key, nome text not null);\nalter table public.etiquetas enable row level security;\n";
+await a.executarTarefa(db, gh, tc.id, {
+  deps: {
+    adapters: roteiro([
+      {
+        texto: "Plano:\n1. Migração da tabela\n2. Página",
+        chamadas: [
+          { name: "escrever_arquivo", input: { caminho: "supabase/migrations/20261109120000_cria_tarefas.sql", conteudo: MIG1 } },
+          { name: "escrever_arquivo", input: { caminho: "supabase/migrations/20261109120100_indice_e_etiquetas.sql", conteudo: MIG2 } },
+          { name: "escrever_arquivo", input: { caminho: "src/app/tarefas/page.tsx", conteudo: "export default function Tarefas() {\n  return <h1>Tarefas</h1>;\n}\n" } },
+        ],
+      },
+      { chamadas: [{ name: "concluir", input: { titulo_pr: "Lista de tarefas", resumo: "Tabela tarefas com RLS e página /tarefas." } }] },
+    ]) as never,
+  },
+});
+await a.aprovarTarefa(db, gh, org0.id, tc.id);
+let te = await lerTarefa(tc.id);
+ok(te.prUrl !== null && (await mensagens()).some((m) => m.includes("Pull request aberto") && m.includes(te.prUrl!)), "PR aberto e o link aparece na conversa");
+
+// Vercel
+ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id), /Conecte a Vercel/)) === "ok", "sem Vercel conectada: pede para conectar");
+await db.insert(schema.connectors).values({ orgId: org0.id, type: "vercel", name: "Vercel · cliente", encryptedCredentials: encryptSecret("vercel-token-bom"), metadata: {} });
+const r7 = await a.publicarPreview(db, gh, org0.id, tc.id);
+te = await lerTarefa(tc.id);
+const projetoVercel = vercel$.estado.projetos[0];
+const dep1 = vercel$.estado.deployments.get(r7.deploymentId)!;
+ok(vercel$.estado.projetos.length === 1 && projetoVercel!.name === "site" && projetoVercel!.link.repo === "site" && projetoVercel!.framework === "nextjs", "projeto criado na Vercel a partir do repositório (Next.js detectado)");
+ok(
+  JSON.stringify(dep1.corpo.gitSource) === JSON.stringify({ type: "github", org: "cliente-teste", repo: "site", ref: te.branch }) && !("target" in dep1.corpo),
+  "deployment de preview da branch do PR (sem target de produção)",
+);
+ok(vercel$.estado.semTime === 0 && te.vercelProjectId === projetoVercel!.id && te.previewState === "QUEUED", "todas as chamadas no time padrão da conta; preview na fila");
+ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id), /já está sendo publicado/)) === "ok", "não publica duas vezes ao mesmo tempo");
+te = await a.atualizarPreview(db, te);
+ok(te.previewState === "BUILDING" && !(await mensagens()).some((m) => m.includes("Preview publicado")), "build em andamento: ainda sem aviso na conversa");
+te = await a.atualizarPreview(db, te);
+const avisos = (await mensagens()).filter((m) => m.includes("Preview publicado"));
+ok(te.previewState === "READY" && te.previewUrl === `https://${dep1.url}`, "preview pronto com o endereço da Vercel");
+ok(avisos.length === 1 && avisos[0]!.includes(`https://${dep1.url}`) && avisos[0]!.includes(te.prUrl!), "link do preview na conversa, junto com o do PR");
+await a.atualizarPreview(db, te);
+await a.atualizarPreviewsDaConversa(db, org0.id, conversa!.id);
+ok((await mensagens()).filter((m) => m.includes("Preview publicado")).length === 1, "o aviso não se repete");
+
+await a.publicarPreview(db, gh, org0.id, tc.id);
+ok(vercel$.estado.projetos.length === 1 && vercel$.estado.deployments.size === 2, "publicar de novo reaproveita o projeto");
+vercel$.estado.falharBuild = true;
+await a.atualizarPreviewsDaConversa(db, org0.id, conversa!.id);
+await a.atualizarPreviewsDaConversa(db, org0.id, conversa!.id);
+te = await lerTarefa(tc.id);
+ok(te.previewState === "ERROR" && Boolean(te.previewError?.includes("exited with 1")), "build com erro: motivo e log guardados", te.previewError ?? "");
+ok((await mensagens()).some((m) => m.includes("não saiu na Vercel")), "a conversa fica sabendo do erro");
+vercel$.estado.falharBuild = false;
+
+vercel$.estado.projetos.length = 0;
+vercel$.estado.semAcesso.add("cliente-teste/site");
+await db.update(schema.agentTasks).set({ vercelProjectId: null }).where(eq(schema.agentTasks.id, tc.id));
+ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id), /instale o app do GitHub/)) === "ok", "Vercel sem acesso ao repositório: diz o que fazer");
+te = await lerTarefa(tc.id);
+ok(te.previewState === "ERROR" && Boolean(te.previewError?.includes("Settings → Git")), "o motivo fica na tarefa");
+vercel$.estado.semAcesso.clear();
+vercel$.estado.token = "outro";
+ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id), /recusou o token/)) === "ok", "token da Vercel inválido: pede um novo");
+vercel$.estado.token = "vercel-token-bom";
+
+// Supabase
+const migs = await a.migracoesDaTarefa(db, tc.id);
+ok(migs.length === 2 && migs[0]!.versao === "20261109120000" && migs[0]!.nome === "cria_tarefas" && migs[1]!.versao === "20261109120100", "migrações do PR em ordem, com a versão do nome do arquivo");
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, REF_A), /Conecte o Supabase/)) === "ok", "sem Supabase conectado: pede para conectar");
+const [conectorSb] = await db.insert(schema.connectors).values({ orgId: org0.id, type: "supabase", name: "Supabase", encryptedCredentials: encryptSecret("sbp_bom"), metadata: {} }).returning();
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, "outroprojetoxyzxyzxy"), /não aparece/)) === "ok", "projeto que não é do cliente: recusado");
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tv.id, REF_A), /não tem migrações/)) === "ok", "tarefa sem migrações: recusada");
+const res1 = await a.aplicarMigracoes(db, org0.id, tc.id, REF_A);
+ok(res1.length === 2 && res1.every((r) => r.ok && !r.erro), "as 2 migrações aplicadas no projeto escolhido");
+const clienteA = new pg.Client({ connectionString: urlDoBanco(BANCOS_DO_CLIENTE[0]!) });
+await clienteA.connect();
+const rls = await clienteA.query("select relrowsecurity from pg_class where relname = 'tarefas'");
+const hist = await clienteA.query("select version, name from supabase_migrations.schema_migrations order by version");
+ok(rls.rows[0]?.relrowsecurity === true, "tabela criada no banco do cliente, com RLS");
+ok(hist.rows.map((r) => `${r.version}:${r.name}`).join(",") === "20261109120000:cria_tarefas,20261109120100:indice_e_etiquetas", "histórico do Supabase CLI gravado (db push não repete)");
+await clienteA.end();
+te = await lerTarefa(tc.id);
+ok(te.supabaseProjectRef === REF_A && (te.migrations ?? []).length === 2, "resultado guardado na tarefa");
+ok((await mensagens()).some((m) => m.includes("Banco atualizado no Supabase") && m.includes("2 migração")), "a conversa fica sabendo");
+const res2 = await a.aplicarMigracoes(db, org0.id, tc.id, REF_A);
+ok(res2.every((r) => r.ok && r.erro === "já estava aplicada"), "aplicar de novo não repete nada");
+
+const novo = await a.criarProjetoSupabase(db, org0.id, { nome: "Tarefas (teste)", taskId: tc.id });
+const criacao = supabase$.estado.criacoes.at(-1)!;
+ok(novo.status === "COMING_UP" && JSON.stringify(criacao.region_selection) === JSON.stringify({ type: "specific", code: "sa-east-1" }), "projeto novo criado em São Paulo");
+const conectorDepois = (await db.query.connectors.findFirst({ where: eq(schema.connectors.id, conectorSb!.id) }))!;
+const criado = (conectorDepois.metadata.projetosCriados as { ref: string; senhaDoBanco: string }[])[0]!;
+ok(
+  criado.ref === novo.ref && decryptSecret(criado.senhaDoBanco) === supabase$.estado.senhas.get(novo.ref) && !JSON.stringify(conectorDepois.metadata).includes(supabase$.estado.senhas.get(novo.ref)!),
+  "senha do banco gerada pela Forja e guardada só criptografada",
+);
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, novo.ref), /ainda não está pronto/)) === "ok", "projeto iniciando: pede para esperar");
+supabase$.estado.projetos.find((p) => p.ref === novo.ref)!.status = "ACTIVE_HEALTHY";
+// no banco B já existe uma tabela "etiquetas": a 2ª migração falha no meio
+const clienteB = new pg.Client({ connectionString: urlDoBanco(BANCOS_DO_CLIENTE[1]!) });
+await clienteB.connect();
+await clienteB.query("create table public.etiquetas (id int)");
+const res3 = await a.aplicarMigracoes(db, org0.id, tc.id, novo.ref);
+const indice = await clienteB.query("select 1 from pg_indexes where indexname = 'tarefas_feita_idx'");
+const histB = await clienteB.query("select version from supabase_migrations.schema_migrations");
+await clienteB.end();
+ok(res3[0]!.ok && !res3[1]!.ok && Boolean(res3[1]!.erro?.includes("already exists")), "migração que falha: para e mostra o erro do banco", JSON.stringify(res3));
+ok(indice.rowCount === 0 && histB.rows.length === 1, "a migração que falhou não deixou nada pela metade (transação) nem entrou no histórico");
+ok((await mensagens()).some((m) => m.includes("Migração falhou no Supabase") && m.includes("1 migração(ões) antes dela")), "a conversa fica sabendo da falha");
+supabase$.estado.token = "outro";
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, REF_A), /recusou o token/)) === "ok", "token do Supabase inválido: pede um novo");
+supabase$.estado.token = "sbp_bom";
+
 // ---------------------------------------------------------------- 6. bloqueio da organização
 await db.update(schema.organizations).set({ planId: null }).where(eq(schema.organizations.id, org0.id));
 ok(
@@ -275,9 +429,12 @@ ok(
 console.log(`\n${falhas ? `✘ ${falhas} falha(s)` : "✔ tudo certo"}`);
 await closeDb();
 await gh$.fechar();
+await vercel$.fechar();
+await supabase$.fechar();
 const limpar = new pg.Client({ connectionString: base });
 await limpar.connect();
 await limpar.query(`drop database if exists ${NOME} with (force)`);
+for (const b of BANCOS_DO_CLIENTE) await limpar.query(`drop database if exists ${b} with (force)`);
 await limpar.end();
 void sql;
 process.exit(falhas ? 1 : 0);

@@ -24,6 +24,41 @@ telas em `/agente`.
    - A descrição do PR traz o resumo do agente, o pedido e o custo.
    - **Descartar** não escreve nada no GitHub.
 5. **"Gerar projeto" na call** leva à nova tarefa com a especificação já no pedido.
+6. **"Enviar ao agente" no chat**: o botão no topo da conversa leva à nova tarefa.
+   - O pedido traz as últimas mensagens, até 14 mil caracteres.
+   - O repositório do projeto já vem escolhido.
+   - A conversa recebe três avisos: o link da tarefa, o do PR e o do preview.
+
+## Entrega: preview na Vercel e banco no Supabase (Sprint 4)
+
+Depois do PR, a tarefa mostra o cartão de entrega. As credenciais são as do cliente, em **Conectores**.
+
+**Vercel** (token da conta ou do time):
+- Ao aprovar, se a Vercel está conectada, o preview sai sozinho:
+  - a Forja acha o projeto ligado ao repositório ou cria um, com o framework lido do `package.json`;
+  - depois cria o deployment de preview da branch do PR (nunca o de produção).
+- A tela acompanha o build. Quando termina, a conversa recebe o link do preview junto com o do PR, uma vez só.
+- Se o build falha, o motivo e o link do log ficam na tarefa e na conversa. **Publicar de novo** tenta outra vez, no
+  mesmo projeto.
+- Para criar o projeto, a Vercel precisa enxergar o repositório: na conta do cliente, Settings → Git, com o app do
+  GitHub liberado para ele. Sem isso, a tarefa diz exatamente o que fazer.
+- O preview fica atrás da proteção padrão da Vercel (login no time do cliente).
+
+**Supabase** (token de acesso da Management API):
+- Quando o agente escreve migrações em `supabase/migrations/AAAAMMDDHHMMSS_nome.sql` (o prompt do agente pede esse
+  padrão), o cartão lista os arquivos.
+- O dono ou um administrador escolhe um projeto, ou cria um em São Paulo, marca a confirmação e aplica.
+  - Cada migração roda inteira ou não roda (transação).
+  - Para na primeira que falhar e mostra o erro do banco.
+  - Fica gravada em `supabase_migrations.schema_migrations`, o mesmo histórico do Supabase CLI. Aplicar de novo não
+    repete nada.
+- Projeto criado pela Forja: a senha do banco é gerada aqui e guardada só criptografada no conector.
+- Projeto ainda iniciando: a Forja pede para esperar 1 ou 2 minutos.
+- O SQL é do agente e roda com permissão total no banco escolhido. Por isso só depois do PR aberto, só para dono ou
+  administrador, com confirmação de que o SQL foi revisado no diff. A tela recomenda um projeto de teste primeiro.
+
+**O que não faz ainda**: variáveis de ambiente do projeto na Vercel (ex.: a URL do Supabase criado) e o deploy de
+produção. O merge do PR no GitHub dispara a produção pela integração Git da própria Vercel.
 
 ## Limites e proteções
 
@@ -72,6 +107,10 @@ instalar pacotes. Ele só lê e altera a cópia, e o único efeito no mundo é o
   - trava de execução e retomada;
   - repositório vazio e repositório sem acesso;
   - modelo sem ferramentas e organização sem plano.
+  - entrega:
+    - conversa → tarefa → PR → preview na Vercel (projeto criado, build, erro, sem acesso, token inválido);
+    - migrações aplicadas num Postgres de verdade no papel do banco do cliente (RLS, histórico do CLI, falha no meio
+      sem deixar nada pela metade, projeto iniciando, projeto de outra conta).
 - `test-integracao/servidores-app.ts`: sobe o GitHub e o modelo simulados para testar pelo app no navegador.
 
 ## Ainda não feito

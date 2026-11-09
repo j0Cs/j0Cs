@@ -8,7 +8,15 @@
 import { generateKeyPairSync } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { createServer } from "node:http";
+import { iniciarSupabaseSimulado, iniciarVercelSimulada } from "./entrega-simulada";
 import { iniciarGithubSimulado } from "./github-simulado";
+
+// Vercel e Supabase do "cliente" (Sprint 4). BANCO_DO_CLIENTE: um Postgres local vazio que faz o papel
+// do banco do projeto no Supabase (as migrações do agente rodam nele de verdade).
+await iniciarVercelSimulada(Number(process.env.PORTA_VERCEL ?? 12304));
+if (process.env.BANCO_DO_CLIENTE) {
+  await iniciarSupabaseSimulado(Number(process.env.PORTA_SUPABASE ?? 12305), { abcdefghijklmnopqrst: process.env.BANCO_DO_CLIENTE }, process.env.BANCO_DO_CLIENTE);
+}
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 writeFileSync(process.env.CHAVE_SAIDA ?? "chave-github-teste.pem", privateKey.export({ type: "pkcs1", format: "pem" }));
@@ -41,6 +49,14 @@ const roteiro: { texto?: string; ferramentas: { name: string; input: Record<stri
     ferramentas: [
       { name: "escrever_arquivo", input: { caminho: "src/app/contato/page.tsx", conteudo: PAGINA } },
       { name: "editar_arquivo", input: { caminho: "src/app/layout.tsx", procurar: '<a href="/">Início</a>', substituir: '<a href="/">Início</a> <a href="/contato">Contato</a>' } },
+      {
+        name: "escrever_arquivo",
+        input: {
+          caminho: "supabase/migrations/20261109130000_cria_contatos.sql",
+          conteudo:
+            "create table public.contatos (\n  id bigint generated always as identity primary key,\n  nome text not null,\n  email text not null,\n  mensagem text not null,\n  criado_em timestamptz not null default now()\n);\nalter table public.contatos enable row level security;\ncreate policy \"qualquer um envia\" on public.contatos for insert with check (true);\n",
+        },
+      },
     ],
   },
   { ferramentas: [{ name: "concluir", input: { titulo_pr: "Página de contato com formulário", resumo: "Cria /contato com nome, e-mail e mensagem e adiciona o link no menu." } }] },
