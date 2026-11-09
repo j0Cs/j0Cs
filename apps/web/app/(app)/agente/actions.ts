@@ -60,7 +60,7 @@ export async function pararTarefaAction(id: string) {
 }
 
 export async function aprovarTarefaAction(id: string): Promise<{ erro?: string; url?: string }> {
-  const { db, org, user } = await getSession();
+  const { db, org, user, role } = await getSession();
   if (!user.emailVerified) return { erro: "Confirme seu e-mail antes." };
   const gh = await githubApp();
   if (!gh) return { erro: "O GitHub ainda não está configurado na Forja." };
@@ -69,7 +69,7 @@ export async function aprovarTarefaAction(id: string): Promise<{ erro?: string; 
     // Vercel conectada: o preview da branch do PR sai sozinho
     if (await conectorDaOrg(db, org.id, "vercel")) {
       after(() =>
-        publicarPreview(db, gh, org.id, id).catch((err) => {
+        publicarPreview(db, gh, org.id, id, { podeCriarProjeto: canManage(role) }).catch((err) => {
           if (!(err instanceof RegraDoAgente)) console.error(JSON.stringify({ level: "error", msg: "preview automático falhou", taskId: id, err: String(err) }));
         }),
       );
@@ -100,12 +100,13 @@ export async function tetoDiarioAction(_: FormState, f: FormData): Promise<FormS
 }
 
 export async function publicarPreviewAction(id: string): Promise<{ erro?: string }> {
-  const { db, org } = await getSession();
+  const { db, org, role } = await getSession();
   const gh = await githubApp();
   if (!gh) return { erro: "O GitHub ainda não está configurado na Forja." };
   if (!(await consumeRateLimit(db, `agente:preview:${org.id}`, 20, 3600))) return { erro: "Muitos previews na última hora. Tente mais tarde." };
   try {
-    await publicarPreview(db, gh, org.id, id);
+    // projeto novo na conta da Vercel só por dono ou administrador; membros publicam em projeto existente
+    await publicarPreview(db, gh, org.id, id, { podeCriarProjeto: canManage(role) });
     return {};
   } catch (e) {
     if (e instanceof RegraDoAgente) return { erro: e.message };
@@ -129,13 +130,18 @@ export async function criarProjetoSupabaseAction(id: string, nome: string): Prom
   }
 }
 
-export async function aplicarMigracoesAction(id: string, ref: string): Promise<{ erro?: string; resultados?: { path: string; ok: boolean; erro?: string }[] }> {
+export async function aplicarMigracoesAction(
+  id: string,
+  ref: string,
+  hash: string,
+  confirmacao: string,
+): Promise<{ erro?: string; resultados?: { path: string; ok: boolean; erro?: string }[] }> {
   const { db, org, role } = await getSession();
   if (!canManage(role)) return { erro: "Só donos e administradores aplicam migrações no banco." };
   if (!/^[a-z0-9]{10,40}$/.test(ref)) return { erro: "Escolha um projeto do Supabase." };
   if (!(await consumeRateLimit(db, `agente:migracoes:${org.id}`, 30, 3600))) return { erro: "Muitas tentativas na última hora." };
   try {
-    const resultados = await aplicarMigracoes(db, org.id, id, ref);
+    const resultados = await aplicarMigracoes(db, org.id, id, { ref, hash: String(hash), confirmacao: String(confirmacao) });
     revalidatePath(`/agente/${id}`);
     return { resultados };
   } catch (e) {

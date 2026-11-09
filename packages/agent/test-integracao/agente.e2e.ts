@@ -327,9 +327,21 @@ let te = await lerTarefa(tc.id);
 ok(te.prUrl !== null && (await mensagens()).some((m) => m.includes("Pull request aberto") && m.includes(te.prUrl!)), "PR aberto e o link aparece na conversa");
 
 // Vercel
-ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id), /Conecte a Vercel/)) === "ok", "sem Vercel conectada: pede para conectar");
+ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id, { podeCriarProjeto: true }), /Conecte a Vercel/)) === "ok", "sem Vercel conectada: pede para conectar");
 await db.insert(schema.connectors).values({ orgId: org0.id, type: "vercel", name: "Vercel · cliente", encryptedCredentials: encryptSecret("vercel-token-bom"), metadata: {} });
-const r7 = await a.publicarPreview(db, gh, org0.id, tc.id);
+ok(
+  (await espera(() => a.publicarPreview(db, gh, org0.id, tc.id, { podeCriarProjeto: false }), /Peça a um dono ou administrador/)) === "ok" && vercel$.estado.projetos.length === 0,
+  "membro comum não cria projeto novo na conta da Vercel",
+);
+// preview automático e um clique ao mesmo tempo: só um publica
+const corrida = await Promise.allSettled([
+  a.publicarPreview(db, gh, org0.id, tc.id, { podeCriarProjeto: true }),
+  a.publicarPreview(db, gh, org0.id, tc.id, { podeCriarProjeto: true }),
+]);
+const ganhou = corrida.find((x) => x.status === "fulfilled") as PromiseFulfilledResult<{ deploymentId: string }> | undefined;
+const perdeu = corrida.find((x) => x.status === "rejected") as PromiseRejectedResult | undefined;
+ok(Boolean(ganhou) && /já está sendo publicado/.test(String(perdeu?.reason?.message)), "duas publicações ao mesmo tempo: só uma passa");
+const r7 = ganhou!.value;
 te = await lerTarefa(tc.id);
 const projetoVercel = vercel$.estado.projetos[0];
 const dep1 = vercel$.estado.deployments.get(r7.deploymentId)!;
@@ -339,7 +351,7 @@ ok(
   "deployment de preview da branch do PR (sem target de produção)",
 );
 ok(vercel$.estado.semTime === 0 && te.vercelProjectId === projetoVercel!.id && te.previewState === "QUEUED", "todas as chamadas no time padrão da conta; preview na fila");
-ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id), /já está sendo publicado/)) === "ok", "não publica duas vezes ao mesmo tempo");
+ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id, { podeCriarProjeto: true }), /já está sendo publicado/)) === "ok", "não publica duas vezes ao mesmo tempo");
 te = await a.atualizarPreview(db, te);
 ok(te.previewState === "BUILDING" && !(await mensagens()).some((m) => m.includes("Preview publicado")), "build em andamento: ainda sem aviso na conversa");
 te = await a.atualizarPreview(db, te);
@@ -350,7 +362,7 @@ await a.atualizarPreview(db, te);
 await a.atualizarPreviewsDaConversa(db, org0.id, conversa!.id);
 ok((await mensagens()).filter((m) => m.includes("Preview publicado")).length === 1, "o aviso não se repete");
 
-await a.publicarPreview(db, gh, org0.id, tc.id);
+await a.publicarPreview(db, gh, org0.id, tc.id, { podeCriarProjeto: true });
 ok(vercel$.estado.projetos.length === 1 && vercel$.estado.deployments.size === 2, "publicar de novo reaproveita o projeto");
 vercel$.estado.falharBuild = true;
 await a.atualizarPreviewsDaConversa(db, org0.id, conversa!.id);
@@ -363,22 +375,29 @@ vercel$.estado.falharBuild = false;
 vercel$.estado.projetos.length = 0;
 vercel$.estado.semAcesso.add("cliente-teste/site");
 await db.update(schema.agentTasks).set({ vercelProjectId: null }).where(eq(schema.agentTasks.id, tc.id));
-ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id), /instale o app do GitHub/)) === "ok", "Vercel sem acesso ao repositório: diz o que fazer");
+ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id, { podeCriarProjeto: true }), /instale o app do GitHub/)) === "ok", "Vercel sem acesso ao repositório: diz o que fazer");
 te = await lerTarefa(tc.id);
 ok(te.previewState === "ERROR" && Boolean(te.previewError?.includes("Settings → Git")), "o motivo fica na tarefa");
 vercel$.estado.semAcesso.clear();
 vercel$.estado.token = "outro";
-ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id), /recusou o token/)) === "ok", "token da Vercel inválido: pede um novo");
+ok((await espera(() => a.publicarPreview(db, gh, org0.id, tc.id, { podeCriarProjeto: true }), /recusou o token/)) === "ok", "token da Vercel inválido: pede um novo");
 vercel$.estado.token = "vercel-token-bom";
 
 // Supabase
 const migs = await a.migracoesDaTarefa(db, tc.id);
+const HASH = a.hashDasMigracoes(migs);
+const em = (ref: string, confirmacao = "Projeto abcd") => ({ ref, hash: HASH, confirmacao });
+ok(migs.every((m) => m.bloqueio === null), "migrações do PR sem bloqueio");
+ok(migs[0]!.avisos.some((x) => x.includes("libera para todos")), "política using (true) vira aviso para quem confirma");
 ok(migs.length === 2 && migs[0]!.versao === "20261109120000" && migs[0]!.nome === "cria_tarefas" && migs[1]!.versao === "20261109120100", "migrações do PR em ordem, com a versão do nome do arquivo");
-ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, REF_A), /Conecte o Supabase/)) === "ok", "sem Supabase conectado: pede para conectar");
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, em(REF_A)), /Conecte o Supabase/)) === "ok", "sem Supabase conectado: pede para conectar");
 const [conectorSb] = await db.insert(schema.connectors).values({ orgId: org0.id, type: "supabase", name: "Supabase", encryptedCredentials: encryptSecret("sbp_bom"), metadata: {} }).returning();
-ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, "outroprojetoxyzxyzxy"), /não aparece/)) === "ok", "projeto que não é do cliente: recusado");
-ok((await espera(() => a.aplicarMigracoes(db, org0.id, tv.id, REF_A), /não tem migrações/)) === "ok", "tarefa sem migrações: recusada");
-const res1 = await a.aplicarMigracoes(db, org0.id, tc.id, REF_A);
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, em("outroprojetoxyzxyzxy")), /não aparece/)) === "ok", "projeto que não é do cliente: recusado");
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tv.id, em(REF_A)), /não tem migrações/)) === "ok", "tarefa sem migrações: recusada");
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, { ...em(REF_A), hash: "0".repeat(64) }), /mudaram desde que a tela abriu/)) === "ok", "SQL diferente do que a tela mostrou: recusado");
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, em(REF_A, "projeto errado")), /digite o nome do projeto/)) === "ok", "sem digitar o nome do projeto: recusado");
+ok(supabase$.estado.consultas.length === 0, "nada rodou no banco do cliente antes da confirmação certa");
+const res1 = await a.aplicarMigracoes(db, org0.id, tc.id, em(REF_A));
 ok(res1.length === 2 && res1.every((r) => r.ok && !r.erro), "as 2 migrações aplicadas no projeto escolhido");
 const clienteA = new pg.Client({ connectionString: urlDoBanco(BANCOS_DO_CLIENTE[0]!) });
 await clienteA.connect();
@@ -390,7 +409,7 @@ await clienteA.end();
 te = await lerTarefa(tc.id);
 ok(te.supabaseProjectRef === REF_A && (te.migrations ?? []).length === 2, "resultado guardado na tarefa");
 ok((await mensagens()).some((m) => m.includes("Banco atualizado no Supabase") && m.includes("2 migração")), "a conversa fica sabendo");
-const res2 = await a.aplicarMigracoes(db, org0.id, tc.id, REF_A);
+const res2 = await a.aplicarMigracoes(db, org0.id, tc.id, em(REF_A));
 ok(res2.every((r) => r.ok && r.erro === "já estava aplicada"), "aplicar de novo não repete nada");
 
 const novo = await a.criarProjetoSupabase(db, org0.id, { nome: "Tarefas (teste)", taskId: tc.id });
@@ -402,13 +421,13 @@ ok(
   criado.ref === novo.ref && decryptSecret(criado.senhaDoBanco) === supabase$.estado.senhas.get(novo.ref) && !JSON.stringify(conectorDepois.metadata).includes(supabase$.estado.senhas.get(novo.ref)!),
   "senha do banco gerada pela Forja e guardada só criptografada",
 );
-ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, novo.ref), /ainda não está pronto/)) === "ok", "projeto iniciando: pede para esperar");
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, em(novo.ref, "Tarefas (teste)")), /ainda não está pronto/)) === "ok", "projeto iniciando: pede para esperar");
 supabase$.estado.projetos.find((p) => p.ref === novo.ref)!.status = "ACTIVE_HEALTHY";
 // no banco B já existe uma tabela "etiquetas": a 2ª migração falha no meio
 const clienteB = new pg.Client({ connectionString: urlDoBanco(BANCOS_DO_CLIENTE[1]!) });
 await clienteB.connect();
 await clienteB.query("create table public.etiquetas (id int)");
-const res3 = await a.aplicarMigracoes(db, org0.id, tc.id, novo.ref);
+const res3 = await a.aplicarMigracoes(db, org0.id, tc.id, em(novo.ref, "Tarefas (teste)"));
 const indice = await clienteB.query("select 1 from pg_indexes where indexname = 'tarefas_feita_idx'");
 const histB = await clienteB.query("select version from supabase_migrations.schema_migrations");
 await clienteB.end();
@@ -416,8 +435,16 @@ ok(res3[0]!.ok && !res3[1]!.ok && Boolean(res3[1]!.erro?.includes("already exist
 ok(indice.rowCount === 0 && histB.rows.length === 1, "a migração que falhou não deixou nada pela metade (transação) nem entrou no histórico");
 ok((await mensagens()).some((m) => m.includes("Migração falhou no Supabase") && m.includes("1 migração(ões) antes dela")), "a conversa fica sabendo da falha");
 supabase$.estado.token = "outro";
-ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, REF_A), /recusou o token/)) === "ok", "token do Supabase inválido: pede um novo");
+ok((await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, em(REF_A)), /recusou o token/)) === "ok", "token do Supabase inválido: pede um novo");
 supabase$.estado.token = "sbp_bom";
+await db.insert(schema.agentTaskFiles).values({ taskId: tc.id, path: "supabase/migrations/sem_data.sql", content: "insert into public.tarefas (titulo) values ('x');" });
+const migs2 = await a.migracoesDaTarefa(db, tc.id);
+const antesDaSemData = supabase$.estado.consultas.length;
+ok(
+  (await espera(() => a.aplicarMigracoes(db, org0.id, tc.id, { ref: REF_A, hash: a.hashDasMigracoes(migs2), confirmacao: "Projeto abcd" }), /precisa começar com data e hora/)) === "ok" &&
+    supabase$.estado.consultas.length === antesDaSemData,
+  "migração sem data no nome: bloqueada (não seria reaplicável com segurança)",
+);
 
 // ---------------------------------------------------------------- 6. bloqueio da organização
 await db.update(schema.organizations).set({ planId: null }).where(eq(schema.organizations.id, org0.id));

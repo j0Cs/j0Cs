@@ -30,11 +30,55 @@ export const REGIAO_PADRAO = "sa-east-1";
 
 export const CAMINHO_DE_MIGRACAO = /^supabase\/migrations\/([^/]+)\.sql$/;
 
-/** "20261109120000_cria_tarefas.sql" → versão 20261109120000, nome cria_tarefas (padrão do CLI). */
-export function versaoDaMigracao(path: string, reserva: string) {
+/** Maior migração que a Forja aplica (o resto, pelo Supabase CLI): precisa caber na revisão. */
+export const MIGRACAO_MAXIMA = 100_000;
+
+/**
+ * "20261109120000_cria_tarefas.sql" → versão 20261109120000, nome cria_tarefas (padrão do CLI).
+ * Sem os 14 dígitos no começo, null: a versão precisa ser estável para o histórico não repetir nada.
+ */
+export function versaoDaMigracao(path: string) {
   const arquivo = CAMINHO_DE_MIGRACAO.exec(path)?.[1] ?? path;
-  const m = /^(\d{8,})_(.+)$/.exec(arquivo);
-  return m ? { versao: m[1]!, nome: m[2]! } : { versao: reserva, nome: arquivo };
+  const m = /^(\d{14})_(.+)$/.exec(arquivo);
+  return m ? { versao: m[1]!, nome: m[2]! } : null;
+}
+
+/** SQL sem comentários e sem blocos $tag$...$tag$ (corpos de função), para procurar comandos soltos. */
+function sqlSolto(sql: string) {
+  return sql
+    .replace(/\$([A-Za-z_][A-Za-z0-9_]*)?\$[\s\S]*?\$\1\$/g, " ")
+    .replace(/--[^\n]*/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/'(?:[^']|'')*'/g, "''");
+}
+
+/**
+ * Revisão automática do SQL antes de aplicar.
+ * - bloqueio: o que a Forja não aplica (controle de transação quebraria o "inteira ou nada").
+ * - avisos: o que merece atenção redobrada de quem confirma.
+ */
+export function analisarMigracao(path: string, sql: string) {
+  const avisos: string[] = [];
+  if (!versaoDaMigracao(path)) {
+    return { bloqueio: "O nome precisa começar com data e hora (AAAAMMDDHHMMSS_nome.sql). Peça ao agente para renomear.", avisos };
+  }
+  if (sql.length > MIGRACAO_MAXIMA) return { bloqueio: "Grande demais para revisar aqui (mais de 100 mil caracteres). Aplique pelo Supabase CLI.", avisos };
+  const s = sqlSolto(sql).toLowerCase();
+  if (/(^|;)\s*(begin|commit|rollback|end|abort|savepoint|release|start\s+transaction)\b[^;]*(;|$)/.test(s)) {
+    return { bloqueio: "Tem controle de transação (begin/commit/rollback). A Forja roda cada migração numa transação só; tire esses comandos.", avisos };
+  }
+  const regras: [RegExp, string][] = [
+    [/\bdrop\s+(table|schema|database|column|owned)\b|\btruncate\b|\bdelete\s+from\b/, "apaga dados ou estruturas (drop, truncate ou delete)"],
+    [/\bdisable\s+row\s+level\s+security\b|\bno\s+force\s+row\s+level\s+security\b/, "desliga a RLS de uma tabela"],
+    [/\bgrant\b[^;]*\bto\s+(anon|authenticated|public)\b/, "dá permissão a anon, authenticated ou public"],
+    [/\busing\s*\(\s*true\s*\)|\bwith\s+check\s*\(\s*true\s*\)/, "política de RLS que libera para todos (true)"],
+    [/\b(alter|create|drop)\s+(role|user)\b/, "mexe em papéis do banco"],
+    [/\bsecurity\s+definer\b/, "função com os direitos do dono (security definer)"],
+    [/\b(dblink|pg_net|http_get|http_post|net\.http_)/, "acessa a rede de dentro do banco"],
+    [/\bauth\.|\bstorage\./, "mexe nos schemas do Supabase (auth ou storage)"],
+  ];
+  for (const [re, texto] of regras) if (re.test(s)) avisos.push(texto);
+  return { bloqueio: null as string | null, avisos };
 }
 
 /** Texto entre $tag$ ... $tag$ sem chance de colidir com o conteúdo. */
@@ -47,7 +91,11 @@ export function textoSql(valor: string) {
 export const HISTORICO_DO_CLI = `create schema if not exists supabase_migrations;
 create table if not exists supabase_migrations.schema_migrations (version text not null primary key, statements text[], name text);`;
 
-/** SQL da migração + o registro no histórico, numa consulta só (roda inteira ou nada). */
+/**
+ * SQL da migração + o registro no histórico, numa consulta só: o protocolo simples do Postgres roda
+ * várias instruções numa transação implícita (inteira ou nada). Por isso migração com begin/commit
+ * é bloqueada antes (analisarMigracao).
+ */
 export function sqlDaMigracao(m: { versao: string; nome: string; sql: string }) {
   return `${m.sql.trim().replace(/;?\s*$/, ";")}
 insert into supabase_migrations.schema_migrations (version, name, statements) values (${textoSql(m.versao)}, ${textoSql(m.nome)}, array[${textoSql(m.sql)}]);`;

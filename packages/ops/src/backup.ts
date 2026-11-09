@@ -116,7 +116,25 @@ export async function prepararAcessoDoBackup(db: Db, urlDoBanco = process.env.DA
     `grant select on all sequences in schema public to ${p}`,
     `alter default privileges in schema public grant select on tables to ${p}`,
     `alter default privileges in schema public grant select on sequences to ${p}`,
-    `grant insert, update on public.settings to ${p}`,
+    // escrever, só pelo registro do backup: nada de mexer no câmbio ou em outra chave de settings
+    `revoke insert, update, delete on public.settings from ${p}`,
+    `create schema if not exists forja_interno`,
+    `revoke all on schema forja_interno from public`,
+    `create or replace function forja_interno.registrar_backup(dados jsonb) returns void
+      language sql security definer set search_path = pg_catalog, pg_temp as $fn$
+        insert into public.settings (key, value, updated_at)
+        values ('backup_meta', jsonb_build_object(
+          'em', now(),
+          'ok', coalesce((dados->>'ok')::boolean, false),
+          'detalhe', left(coalesce(dados->>'detalhe', ''), 500),
+          'execucao', left(dados->>'execucao', 300),
+          'tabelas', (dados->>'tabelas')::int,
+          'tamanhoBytes', (dados->>'tamanhoBytes')::bigint), now())
+        on conflict (key) do update set value = excluded.value, updated_at = now();
+      $fn$`,
+    `revoke all on function forja_interno.registrar_backup(jsonb) from public`,
+    `grant usage on schema forja_interno to ${p}`,
+    `grant execute on function forja_interno.registrar_backup(jsonb) to ${p}`,
   ]) {
     await db.execute(sql.raw(comando));
   }
@@ -137,6 +155,10 @@ export async function prepararAcessoDoBackup(db: Db, urlDoBanco = process.env.DA
   const destino = new URL(`postgresql://${u.host}/${banco}`);
   destino.username = ref ? `${p}.${ref}` : p;
   destino.password = senha;
-  if (ref) destino.port = "5432";
+  if (ref) {
+    destino.port = "5432";
+    // conexão sempre cifrada (sem o parâmetro, o padrão do libpq aceitaria cair para texto puro)
+    destino.searchParams.set("sslmode", "require");
+  }
   return { url: destino.toString(), usuario: destino.username, host: destino.hostname };
 }

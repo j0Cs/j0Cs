@@ -250,8 +250,13 @@ const papel = new pg.Client({ connectionString: acesso.url });
 await papel.connect();
 const leu = await papel.query("select count(*)::int as n from organizations");
 ok(leu.rows[0].n >= 1, "o backup lê as tabelas (com RLS ligada)");
-await papel.query("insert into settings (key, value) values ('backup_meta', '{}'::jsonb) on conflict (key) do update set value = excluded.value");
-ok(true, "o backup grava o próprio registro em settings");
+await papel.query("select forja_interno.registrar_backup(jsonb_build_object('ok', true, 'detalhe', 'teste', 'tabelas', 28, 'tamanhoBytes', 1000))");
+const registro = await db.query.settings.findFirst({ where: eq(schema.settings.key, "backup_meta") });
+ok((registro?.value as { ok?: boolean; tabelas?: number })?.ok === true && (registro?.value as { tabelas?: number }).tabelas === 28, "o backup grava o próprio registro (pela função)");
+const cambio = await papel.query("update settings set value = '{\"fxUsdBrl\": 0.01}'::jsonb where key = 'pricing'").then(() => "passou", (e: Error) => e.message);
+ok(/permission denied/.test(cambio), "o backup não mexe em outras chaves de settings (câmbio)", cambio);
+const direto = await papel.query("insert into settings (key, value) values ('backup_meta', '{}'::jsonb) on conflict (key) do update set value = excluded.value").then(() => "passou", (e: Error) => e.message);
+ok(/permission denied/.test(direto), "nem escreve o registro direto na tabela", direto);
 const negado = await papel.query("update organizations set name = 'x'").then(() => "passou", (e: Error) => e.message);
 ok(/permission denied/.test(negado), "o backup não altera outras tabelas", negado);
 await papel.end();
@@ -265,8 +270,8 @@ ok(!entrouComAVelha && renovado.url !== acesso.url, "gerar de novo troca a senha
 const comoSupabase = await o.prepararAcessoDoBackup(db, "postgresql://postgres.abcdefghijklmnopqrst:x@aws-0-us-east-1.pooler.supabase.com:6543/postgres");
 const us = new URL(comoSupabase.url);
 ok(
-  us.username === "forja_backup.abcdefghijklmnopqrst" && us.port === "5432" && us.hostname === "aws-0-us-east-1.pooler.supabase.com" && us.pathname === "/postgres",
-  "Supabase: usuário com o ref do projeto e pooler em modo sessão (5432)",
+  us.username === "forja_backup.abcdefghijklmnopqrst" && us.port === "5432" && us.hostname === "aws-0-us-east-1.pooler.supabase.com" && us.pathname === "/postgres" && us.searchParams.get("sslmode") === "require",
+  "Supabase: usuário com o ref do projeto, pooler em modo sessão (5432) e TLS obrigatório",
   comoSupabase.url.replace(/:[^:@]+@/, ":***@"),
 );
 

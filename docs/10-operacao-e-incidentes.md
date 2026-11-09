@@ -39,6 +39,13 @@ Nos **Secrets do Supabase** (Edge Functions → Secrets), onde ficam as chaves d
 
 Se as mesmas chaves de API servem a outros sistemas, a conciliação nunca bate. Use um workspace ou projeto só da Forja.
 
+**Risco conhecido**: chave de admin manda na organização do provedor: cria chaves, convida pessoas. Ela chega aos dois
+apps pela função `forja-chaves`, como as outras. Quem invadir o forja-web teria acesso a ela, mas também já teria a
+chave secreta do Supabase.
+- Se não quiser esse risco agora, deixe as chaves de admin de fora: a conciliação aparece como "sem relatório", e o
+  resto funciona.
+- Melhoria planejada: uma credencial só do painel para os segredos de admin.
+
 ## Backup diário fora do Supabase
 
 O workflow **Backup diário** (`.github/workflows/backup.yml`) roda todo dia às 03:47 de Brasília:
@@ -60,8 +67,15 @@ O workflow **Backup diário** (`.github/workflows/backup.yml`) roda todo dia às
 por qualquer pessoa logada no GitHub. Por isso a cópia sai cifrada (só a chave privada do dono abre) e o log não mostra
 dados nem contagens. Tornar o repositório privado é recomendado.
 
-O backup entra no banco com um papel próprio, `forja_backup`: ele lê as tabelas da Forja e só escreve o próprio
-registro. Não altera mais nada e não enxerga os schemas do Supabase (auth, storage).
+O backup entra no banco com um papel próprio, `forja_backup`:
+- lê as tabelas da Forja;
+- para gravar o resultado, só pode chamar a função `forja_interno.registrar_backup`; não escreve em nenhuma tabela, nem
+  no câmbio, que fica na mesma tabela `settings`;
+- não enxerga os schemas do Supabase (auth, storage);
+- a URL exige conexão cifrada (`sslmode=require`).
+
+O log da execução, que é público, mostra só os passos e, se algo falhar, a linha do erro. Os detalhes do Postgres, que
+podem trazer valores das linhas, ficam de fora.
 
 ### Configurar (uma vez, uns 5 minutos)
 

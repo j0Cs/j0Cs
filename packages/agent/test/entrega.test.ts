@@ -29,8 +29,9 @@ describe("nome do projeto na Vercel", () => {
 
 describe("migrações do Supabase", () => {
   it("versão e nome no padrão do CLI", () => {
-    expect(versaoDaMigracao("supabase/migrations/20261109120000_cria_tarefas.sql", "x")).toEqual({ versao: "20261109120000", nome: "cria_tarefas" });
-    expect(versaoDaMigracao("supabase/migrations/sem_data.sql", "20261109999999")).toEqual({ versao: "20261109999999", nome: "sem_data" });
+    expect(versaoDaMigracao("supabase/migrations/20261109120000_cria_tarefas.sql")).toEqual({ versao: "20261109120000", nome: "cria_tarefas" });
+    expect(versaoDaMigracao("supabase/migrations/sem_data.sql")).toBeNull();
+    expect(versaoDaMigracao("supabase/migrations/0001_curta.sql")).toBeNull();
   });
   it("texto entre $tag$ não colide com o conteúdo", () => {
     expect(textoSql("abc")).toBe("$forja$abc$forja$");
@@ -43,5 +44,31 @@ describe("migrações do Supabase", () => {
     const q = sqlDaMigracao({ versao: "20261109120000", nome: "cria", sql: "create table t (id int)" });
     expect(q.startsWith("create table t (id int);\ninsert into supabase_migrations.schema_migrations")).toBe(true);
     expect(q).toContain("array[$forja$create table t (id int)$forja$]");
+  });
+});
+
+describe("revisão automática das migrações", () => {
+  const P = "supabase/migrations/20261109120000_x.sql";
+  it("bloqueia nome sem data, controle de transação e arquivo grande demais", async () => {
+    const { analisarMigracao } = await import("../src/supabase");
+    expect(analisarMigracao("supabase/migrations/init.sql", "create table t (id int);").bloqueio).toMatch(/data e hora/);
+    expect(analisarMigracao(P, "create table t (id int);\ncommit;\ncreate table u (id int);").bloqueio).toMatch(/controle de transação/);
+    expect(analisarMigracao(P, "BEGIN;\ncreate table t (id int);").bloqueio).toMatch(/controle de transação/);
+    expect(analisarMigracao(P, `select '${"x".repeat(100_001)}';`).bloqueio).toMatch(/Grande demais/);
+  });
+  it("begin/end dentro de função e em texto não bloqueiam", async () => {
+    const { analisarMigracao } = await import("../src/supabase");
+    const funcao = "create function f() returns void language plpgsql as $$\nbegin\n  perform 1;\nend;\n$$;\ncomment on table t is 'commit; begin;';\n-- commit;\n";
+    expect(analisarMigracao(P, funcao).bloqueio).toBeNull();
+  });
+  it("avisa o que merece atenção", async () => {
+    const { analisarMigracao } = await import("../src/supabase");
+    const r = analisarMigracao(P, "alter table t disable row level security;\ngrant select on t to anon;\ndrop table velha;\ncreate policy p on t for select using (true);");
+    expect(r.bloqueio).toBeNull();
+    expect(r.avisos.join(" | ")).toMatch(/desliga a RLS/);
+    expect(r.avisos.join(" | ")).toMatch(/anon, authenticated ou public/);
+    expect(r.avisos.join(" | ")).toMatch(/apaga dados/);
+    expect(r.avisos.join(" | ")).toMatch(/libera para todos/);
+    expect(analisarMigracao(P, "create table t (id int);\nalter table t enable row level security;").avisos).toEqual([]);
   });
 });

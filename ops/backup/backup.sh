@@ -24,11 +24,25 @@ TESTE="forja_restauracao_$(date -u +%Y%m%d%H%M%S)"
 SERVIDOR_TESTE="${DESTINO_TESTE_URL%/*}"
 DESTINO="$SERVIDOR_TESTE/$TESTE"
 
+ERROS="$SAIDA/erros.txt"
 limpar() {
-  rm -f "$DUMP" "$SAIDA/origem.tsv" "$SAIDA/restaurado.tsv"
+  rm -f "$DUMP" "$SAIDA/origem.tsv" "$SAIDA/restaurado.tsv" "$ERROS"
   psql "$DESTINO_TESTE_URL" -qAt -c "drop database if exists $TESTE with (force)" >/dev/null 2>&1 || true
 }
 trap limpar EXIT
+
+# Roda um passo. Se falhar, o log (público) mostra só a linha do erro: sem DETAIL/CONTEXT, que podem
+# trazer valores de linhas (ex.: Key (email)=(...)), e sem valores entre parênteses.
+rodar() {
+  local etapa="$1"
+  shift
+  if ! "$@" 2> "$ERROS"; then
+    echo "Reprovado em: $etapa."
+    grep -iE "error|fatal" "$ERROS" | grep -viE "^[[:space:]]*(DETAIL|CONTEXT|LINE|HINT|QUERY)" \
+      | sed -E 's/\([^)]*\)=\([^)]*\)/(…)=(…)/g' | cut -c1-200 | head -3
+    exit 1
+  fi
+}
 
 CONTAGEM="select table_schema || '.' || table_name,
   (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', table_schema, table_name), false, true, '')))[1]::text
@@ -39,18 +53,18 @@ CONTAGEM="select table_schema || '.' || table_name,
 SEM_DADOS="public.sessions public.verifications"
 
 echo "1/4 Copiando o banco (pg_dump)…"
-pg_dump --format=custom --compress=9 --no-owner --no-privileges --no-publications --no-subscriptions \
+rodar "cópia (pg_dump)" pg_dump --format=custom --compress=9 --no-owner --no-privileges --no-publications --no-subscriptions \
   --schema=public --schema=drizzle \
   --exclude-table-data=public.sessions --exclude-table-data=public.verifications \
   --file="$DUMP" "$ORIGEM_URL"
-psql "$ORIGEM_URL" -qAt -F $'\t' -c "$CONTAGEM" > "$SAIDA/origem.tsv"
+rodar "contagem na origem" psql "$ORIGEM_URL" -qAt -F $'\t' -c "$CONTAGEM" > "$SAIDA/origem.tsv"
 for t in $SEM_DADOS; do sed -i "s/^$t\t.*/$t\t0/" "$SAIDA/origem.tsv"; done
 
 echo "2/4 Restaurando num banco separado…"
-psql "$DESTINO_TESTE_URL" -qAt -c "create database $TESTE" >/dev/null
+rodar "banco de teste" psql "$DESTINO_TESTE_URL" -qAt -c "create database $TESTE" >/dev/null
 # --clean recria o schema public do banco novo; --exit-on-error: qualquer erro reprova o backup
-pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error --dbname="$DESTINO" "$DUMP"
-psql "$DESTINO" -qAt -F $'\t' -c "$CONTAGEM" > "$SAIDA/restaurado.tsv"
+rodar "restauração de teste" pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error --dbname="$DESTINO" "$DUMP"
+rodar "contagem na restauração" psql "$DESTINO" -qAt -F $'\t' -c "$CONTAGEM" > "$SAIDA/restaurado.tsv"
 
 echo "3/4 Conferindo a restauração…"
 TABELAS="$(wc -l < "$SAIDA/origem.tsv" | tr -d ' ')"
@@ -74,7 +88,7 @@ MIGRACOES="$(psql "$DESTINO" -qAt -c "select count(*) from drizzle.__drizzle_mig
 echo "   $TABELAS tabelas conferidas; restauração aprovada."
 
 echo "4/4 Cifrando com a chave pública do dono (age)…"
-age --recipient "$AGE_RECIPIENT" --output "$DUMP.age" "$DUMP"
+rodar "cifragem (age)" age --recipient "$AGE_RECIPIENT" --output "$DUMP.age" "$DUMP"
 (cd "$SAIDA" && sha256sum "forja-$DIA.dump.age" > "forja-$DIA.dump.age.sha256")
 BYTES="$(stat -c %s "$DUMP.age")"
 printf '{"tabelas": %s, "tamanhoBytes": %s, "arquivo": "forja-%s.dump.age"}\n' "$TABELAS" "$BYTES" "$DIA" > "$SAIDA/resumo.json"

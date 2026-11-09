@@ -1,4 +1,4 @@
-import { conectorDaOrg, migracoesDaTarefa, supabaseDaOrg } from "@forja/agent";
+import { conectorDaOrg, hashDasMigracoes, migracoesDaTarefa, supabaseDaOrg } from "@forja/agent";
 import { and, asc, eq, schema, sql } from "@forja/db";
 import { buttonClass, PageHeader } from "@forja/ui";
 import Link from "next/link";
@@ -53,7 +53,8 @@ export default async function TarefaPage({ params }: { params: Promise<{ id: str
       taskId: t.id,
       preview: { estado: t.previewState, url: t.previewUrl, erro: t.previewError },
       vercelConectada: Boolean(vercel),
-      migracoes: migracoes.map((m) => m.path),
+      migracoes: migracoes.map((m) => ({ path: m.path, sql: m.sql, bloqueio: m.bloqueio, avisos: m.avisos })),
+      hash: hashDasMigracoes(migracoes),
       supabaseConectado: Boolean(supabase),
       projetos,
       erroProjetos,

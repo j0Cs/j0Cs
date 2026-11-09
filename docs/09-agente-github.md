@@ -54,8 +54,28 @@ Depois do PR, a tarefa mostra o cartão de entrega. As credenciais são as do cl
     repete nada.
 - Projeto criado pela Forja: a senha do banco é gerada aqui e guardada só criptografada no conector.
 - Projeto ainda iniciando: a Forja pede para esperar 1 ou 2 minutos.
-- O SQL é do agente e roda com permissão total no banco escolhido. Por isso só depois do PR aberto, só para dono ou
-  administrador, com confirmação de que o SQL foi revisado no diff. A tela recomenda um projeto de teste primeiro.
+- O SQL é do agente e roda com permissão total no banco escolhido. Por isso as travas:
+  - só depois do PR aberto e só para dono ou administrador;
+  - o cartão mostra o SQL **completo** de cada migração; nenhum projeto vem escolhido, e para aplicar é preciso marcar
+    a confirmação e **digitar o nome do projeto**;
+  - o servidor confere a impressão digital (SHA-256) do SQL que a tela mostrou e recusa se mudou;
+  - a Forja **bloqueia**:
+    - nome sem data e hora (a versão no histórico precisa ser estável, senão a migração rodaria de novo a cada clique);
+    - `begin`/`commit`/`rollback` (quebrariam o "inteira ou nada");
+    - arquivo com mais de 100 mil caracteres;
+  - e **avisa** quando o SQL:
+    - apaga dados (`drop`, `truncate`, `delete`);
+    - desliga a RLS;
+    - dá permissão a `anon`/`authenticated`;
+    - tem política `using (true)`;
+    - mexe em papéis, `security definer`, rede de dentro do banco, ou nos schemas `auth`/`storage`.
+  - Vale o SQL aprovado na Forja: mudanças feitas depois no PR do GitHub não entram (aplique essas pelo Supabase CLI).
+  - A tela recomenda um projeto de teste antes do de produção.
+- **Preview**:
+  - Só dono ou administrador cria um projeto **novo** na conta da Vercel. Membros publicam o preview quando o projeto
+    do repositório já existe.
+  - Duas publicações ao mesmo tempo (o preview automático e um clique) não criam dois projetos: a primeira reserva a
+    tarefa.
 
 **O que não faz ainda**: variáveis de ambiente do projeto na Vercel (ex.: a URL do Supabase criado) e o deploy de
 produção. O merge do PR no GitHub dispara a produção pela integração Git da própria Vercel.
