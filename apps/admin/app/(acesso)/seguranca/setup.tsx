@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Field, inputClass, Notice } from "@forja/ui";
+import { AvisoAcesso, Button, CampoAcesso, inputAcessoClass } from "@forja/ui";
 import { useActionState } from "react";
 import { confirmTwoFactorSetup, startTwoFactorSetup, type SetupState } from "../actions";
 
@@ -10,12 +10,12 @@ export function TwoFactorSetup() {
 
   if (!setup.qr) {
     return (
-      <form action={start} className="space-y-4">
-        <Field label="Confirme sua senha">
-          <input name="password" type="password" autoComplete="current-password" required className={inputClass} />
-        </Field>
-        {setup.error ? <Notice tone="red">{setup.error}</Notice> : null}
-        <Button type="submit" disabled={starting} className="w-full">
+      <form action={start} className="space-y-5">
+        <CampoAcesso label="Confirme sua senha">
+          <input name="password" type="password" autoComplete="current-password" required className={inputAcessoClass} />
+        </CampoAcesso>
+        {setup.error ? <AvisoAcesso tom="erro">{setup.error}</AvisoAcesso> : null}
+        <Button type="submit" variant="brasa" disabled={starting} className="w-full py-2.5 text-[15px]">
           {starting ? "Gerando…" : "Gerar QR code"}
         </Button>
       </form>
@@ -23,24 +23,33 @@ export function TwoFactorSetup() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col items-center gap-2">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={setup.qr} alt="QR code para o app autenticador" width={220} height={220} />
-        {setup.secret ? <code className="break-all text-center text-xs text-zinc-500">{setup.secret}</code> : null}
+    <div className="space-y-5">
+      <div className="flex flex-col items-center gap-3">
+        {/* fundo branco: o QR precisa de contraste para a câmera */}
+        <div className="rounded-md bg-white p-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={setup.qr} alt="QR code para o app autenticador" width={200} height={200} />
+        </div>
+        {setup.secret ? <code className="break-all text-center font-mono text-xs text-aco-400">{setup.secret}</code> : null}
       </div>
       {setup.backupCodes?.length ? (
-        <Notice tone="amber">
+        <AvisoAcesso tom="atencao">
           <p className="mb-2 font-medium">Guarde estes códigos de backup num lugar seguro (cada um vale uma vez):</p>
-          <p className="font-mono text-xs leading-6">{setup.backupCodes.join("  ·  ")}</p>
-        </Notice>
+          <p className="font-mono text-xs leading-6 text-aco-100">{setup.backupCodes.join("  ·  ")}</p>
+        </AvisoAcesso>
       ) : null}
-      <form action={verify} className="space-y-3">
-        <Field label="Código de 6 dígitos do app">
-          <input name="code" inputMode="numeric" autoComplete="one-time-code" required className={`${inputClass} text-center text-lg tracking-widest`} />
-        </Field>
-        {confirm.error ? <Notice tone="red">{confirm.error}</Notice> : null}
-        <Button type="submit" disabled={verifying} className="w-full">
+      <form action={verify} className="space-y-5">
+        <CampoAcesso label="Código de 6 dígitos do app">
+          <input
+            name="code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            required
+            className={`${inputAcessoClass} text-center font-mono text-2xl tracking-[0.5em]`}
+          />
+        </CampoAcesso>
+        {confirm.error ? <AvisoAcesso tom="erro">{confirm.error}</AvisoAcesso> : null}
+        <Button type="submit" variant="brasa" disabled={verifying} className="w-full py-2.5 text-[15px]">
           {verifying ? "Verificando…" : "Ativar e entrar"}
         </Button>
       </form>

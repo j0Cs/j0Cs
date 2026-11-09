@@ -1,8 +1,9 @@
 import { getDb, getInvitation } from "@forja/db";
-import { Field, inputClass, Notice } from "@forja/ui";
+import { AvisoAcesso, CampoAcesso, inputAcessoClass, linkAcessoClass } from "@forja/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
+import { TituloDeAcesso } from "@/components/acesso/titulo";
 import { getAuthUser } from "@/lib/session";
 import { signUpAction } from "../actions";
 
@@ -15,32 +16,35 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <h1 className="text-lg font-semibold">Criar conta</h1>
-      <p className="mb-5 text-sm text-zinc-500">
-        {invite ? (
-          <>
-            Você foi convidado para <b>{invite.orgName}</b>.
-          </>
-        ) : (
-          "7 dias grátis com R$ 10 em créditos. Sem cartão."
-        )}
-      </p>
+      <TituloDeAcesso
+        sub={
+          invite ? (
+            <>
+              Você foi convidado para <b className="font-medium text-aco-100">{invite.orgName}</b>.
+            </>
+          ) : (
+            "Comece grátis, sem cartão de crédito."
+          )
+        }
+      >
+        Criar conta
+      </TituloDeAcesso>
       {convite && !invite ? (
-        <div className="mb-4">
-          <Notice tone="red">Convite inválido ou expirado. Você ainda pode criar uma conta própria.</Notice>
+        <div className="mb-5">
+          <AvisoAcesso tom="atencao">Convite inválido ou expirado. Você ainda pode criar uma conta própria.</AvisoAcesso>
         </div>
       ) : null}
-      <ActionForm action={signUpAction} submit="Criar conta" pending="Criando…" variant="brand">
+      <ActionForm action={signUpAction} submit="Criar conta" pending="Criando…" tema="acesso" className="space-y-5">
         {invite ? <input type="hidden" name="invite" value={convite} /> : null}
-        <Field label="Seu nome">
-          <input name="name" autoComplete="name" required className={inputClass} />
-        </Field>
+        <CampoAcesso label="Seu nome">
+          <input name="name" autoComplete="name" required className={inputAcessoClass} />
+        </CampoAcesso>
         {!invite ? (
-          <Field label="Empresa" hint="Se você é autônomo, use seu nome.">
-            <input name="company" autoComplete="organization" required className={inputClass} />
-          </Field>
+          <CampoAcesso label="Empresa" hint="Se você é autônomo, use seu nome.">
+            <input name="company" autoComplete="organization" required className={inputAcessoClass} />
+          </CampoAcesso>
         ) : null}
-        <Field label="E-mail">
+        <CampoAcesso label="E-mail">
           <input
             name="email"
             type="email"
@@ -48,16 +52,16 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
             required
             defaultValue={invite?.invite.email}
             readOnly={Boolean(invite)}
-            className={inputClass}
+            className={inputAcessoClass}
           />
-        </Field>
-        <Field label="Senha" hint="Mínimo de 8 caracteres.">
-          <input name="password" type="password" autoComplete="new-password" minLength={8} required className={inputClass} />
-        </Field>
+        </CampoAcesso>
+        <CampoAcesso label="Senha" hint="Pelo menos 8 caracteres.">
+          <input name="password" type="password" autoComplete="new-password" minLength={8} required className={inputAcessoClass} />
+        </CampoAcesso>
       </ActionForm>
-      <p className="mt-4 text-center text-xs text-zinc-500">
+      <p className="mt-5 text-center text-sm text-aco-300">
         Já tem conta?{" "}
-        <Link href={convite ? `/entrar?convite=${convite}` : "/entrar"} className="font-medium text-zinc-900">
+        <Link href={convite ? `/entrar?convite=${convite}` : "/entrar"} className={linkAcessoClass(true)}>
           Entrar
         </Link>
       </p>

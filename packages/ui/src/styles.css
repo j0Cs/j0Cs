@@ -93,7 +93,75 @@ body {
   animation: surgir 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
+/* Telas de acesso (login, cadastro, 2FA): a mesma oficina, com a luz da forja à esquerda */
+.acesso {
+  color-scheme: dark;
+  background:
+    radial-gradient(ellipse 55% 50% at 18% 42%, rgb(255 106 26 / 0.09), transparent 70%),
+    radial-gradient(ellipse 50% 45% at 95% 105%, rgb(74 134 224 / 0.1), transparent 70%),
+    var(--color-aco-900);
+  color: var(--color-aco-100);
+}
+.acesso-dono {
+  background:
+    radial-gradient(ellipse 60% 40% at 50% -5%, rgb(255 106 26 / 0.1), transparent 70%),
+    var(--color-aco-950);
+}
+
+/*
+ * Régua de têmpera: as cores que o aço ganha ao ser aquecido (palha, bronze, pavão, azul) e a
+ * brasa da forja. Ao abrir, a régua "aquece" da esquerda para a direita e a brasa para no fim.
+ */
+.regua-faixa {
+  background: linear-gradient(
+    90deg,
+    var(--color-palha) 0%,
+    var(--color-bronze) 25%,
+    var(--color-pavao) 50%,
+    var(--color-revenido) 75%,
+    var(--color-brasa) 100%
+  );
+  animation: aquecer 1.6s cubic-bezier(0.45, 0, 0.2, 1) 0.25s both;
+}
+.regua-brasa {
+  left: 100%;
+  animation:
+    percorrer 1.6s cubic-bezier(0.45, 0, 0.2, 1) 0.25s both,
+    pulsar 3.2s ease-in-out 1.9s infinite;
+}
+@keyframes aquecer {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes percorrer {
+  from {
+    left: 0%;
+  }
+  to {
+    left: 100%;
+  }
+}
+@keyframes pulsar {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgb(255 106 26 / 0.25),
+      0 0 18px 4px rgb(255 106 26 / 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgb(255 106 26 / 0.15),
+      0 0 26px 8px rgb(255 106 26 / 0.6);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .regua-faixa,
+  .regua-brasa,
   .anim-surgir,
   .nucleo *,
   .anim-cintilar {

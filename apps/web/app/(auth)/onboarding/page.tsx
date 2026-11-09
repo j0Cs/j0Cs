@@ -1,8 +1,9 @@
 import { getDb, listUserOrganizations } from "@forja/db";
-import { Field, inputClass } from "@forja/ui";
+import { CampoAcesso, inputAcessoClass, linkAcessoClass } from "@forja/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
+import { TituloDeAcesso } from "@/components/acesso/titulo";
 import { getAuthUser } from "@/lib/session";
 import { createOrgAction } from "../actions";
 
@@ -17,20 +18,23 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
 
   return (
     <>
-      <h1 className="text-lg font-semibold">{orgs.length ? "Nova organização" : `Bem-vindo, ${user.name.split(" ")[0]}!`}</h1>
-      <p className="mb-5 text-sm text-zinc-500">
-        {orgs.length
-          ? "Cada organização tem seus próprios projetos, equipe, plano e créditos."
-          : "Só falta o nome da sua empresa. Você começa com 7 dias grátis e R$ 10 em créditos."}
-      </p>
-      <ActionForm action={createOrgAction} submit="Continuar" pending="Criando…" variant="brand">
-        <Field label="Empresa" hint="Se você é autônomo, use seu nome.">
-          <input name="company" autoComplete="organization" required className={inputClass} />
-        </Field>
+      <TituloDeAcesso
+        sub={
+          orgs.length
+            ? "Cada organização tem seus próprios projetos, equipe, plano e créditos."
+            : "Só falta o nome da sua empresa. Você começa com 7 dias grátis e R$ 10 em créditos."
+        }
+      >
+        {orgs.length ? "Nova organização" : `Olá, ${user.name.split(" ")[0]}`}
+      </TituloDeAcesso>
+      <ActionForm action={createOrgAction} submit="Continuar" pending="Criando…" tema="acesso" className="space-y-5">
+        <CampoAcesso label="Empresa" hint="Se você é autônomo, use seu nome.">
+          <input name="company" autoComplete="organization" required className={inputAcessoClass} />
+        </CampoAcesso>
       </ActionForm>
       {orgs.length ? (
-        <p className="mt-4 text-center text-xs">
-          <Link href="/equipe" className="text-zinc-500">
+        <p className="mt-5 text-center text-sm">
+          <Link href="/equipe" className={linkAcessoClass()}>
             Cancelar
           </Link>
         </p>

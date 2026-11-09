@@ -1,6 +1,7 @@
-import { Field, inputClass } from "@forja/ui";
+import { CampoAcesso, inputAcessoClass, linkAcessoClass } from "@forja/ui";
 import Link from "next/link";
 import { ActionForm } from "@/components/action-form";
+import { TituloDeAcesso } from "@/components/acesso/titulo";
 import { requestResetAction } from "../actions";
 
 export const metadata = { title: "Recuperar senha" };
@@ -8,15 +9,14 @@ export const metadata = { title: "Recuperar senha" };
 export default function ForgotPasswordPage() {
   return (
     <>
-      <h1 className="text-lg font-semibold">Recuperar senha</h1>
-      <p className="mb-5 text-sm text-zinc-500">Enviaremos um link para criar uma nova senha.</p>
-      <ActionForm action={requestResetAction} submit="Enviar link" pending="Enviando…">
-        <Field label="E-mail">
-          <input name="email" type="email" autoComplete="email" required className={inputClass} />
-        </Field>
+      <TituloDeAcesso sub="Informe o e-mail da sua conta para receber o link.">Recuperar senha</TituloDeAcesso>
+      <ActionForm action={requestResetAction} submit="Enviar link" pending="Enviando…" tema="acesso" className="space-y-5">
+        <CampoAcesso label="E-mail">
+          <input name="email" type="email" autoComplete="email" required className={inputAcessoClass} />
+        </CampoAcesso>
       </ActionForm>
-      <p className="mt-4 text-center text-xs">
-        <Link href="/entrar" className="text-zinc-500 hover:text-zinc-900">
+      <p className="mt-5 text-center text-sm">
+        <Link href="/entrar" className={linkAcessoClass()}>
           Voltar para entrar
         </Link>
       </p>

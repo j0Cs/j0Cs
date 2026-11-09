@@ -73,6 +73,10 @@ const buttonVariants = {
   secondary: "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50",
   danger: "border border-red-200 bg-white text-red-700 hover:bg-red-50",
   ghost: "text-zinc-600 hover:bg-zinc-100",
+  /** Telas de acesso (tema da oficina): ação principal em brasa e secundária em aço. */
+  brasa:
+    "bg-brasa font-semibold text-aco-950 shadow-[0_10px_30px_-12px_rgb(255_106_26/0.7)] hover:bg-brasa-claro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-revenido",
+  aco: "border border-aco-700 bg-aco-850 text-aco-100 hover:border-aco-500 hover:bg-aco-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-revenido",
 } as const;
 
 export const buttonClass = (variant: keyof typeof buttonVariants = "primary", size: "sm" | "md" = "md") =>
@@ -105,6 +109,43 @@ export function Field({ label, hint, children }: { label: string; hint?: ReactNo
     </label>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Telas de acesso (login, cadastro, 2FA): tema escuro da oficina
+// ---------------------------------------------------------------------------
+
+export const inputAcessoClass =
+  "block w-full rounded-md border border-aco-700 bg-aco-950/70 px-3.5 py-2.5 text-[15px] text-aco-100 placeholder:text-aco-500 transition-colors hover:border-aco-500 focus:border-revenido focus:outline-none focus:ring-2 focus:ring-revenido/30 read-only:text-aco-300";
+
+export function CampoAcesso({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block font-mono text-[11px] uppercase tracking-[0.18em] text-aco-300">{label}</span>
+      {children}
+      {hint ? <span className="mt-1.5 block text-xs text-aco-300">{hint}</span> : null}
+    </label>
+  );
+}
+
+export function AvisoAcesso({ tom = "erro", children }: { tom?: "erro" | "info" | "atencao"; children: ReactNode }) {
+  const tons = {
+    erro: "border-brasa bg-brasa/10 text-brasa-claro",
+    info: "border-revenido bg-revenido/10 text-aco-100",
+    atencao: "border-palha bg-palha/10 text-palha",
+  };
+  return (
+    <div role={tom === "erro" ? "alert" : "status"} className={cx("rounded-r-md border-l-2 px-3.5 py-2.5 text-sm leading-relaxed", tons[tom])}>
+      {children}
+    </div>
+  );
+}
+
+/** Link discreto das telas de acesso; `destaque` para a ação alternativa principal (ex.: criar conta). */
+export const linkAcessoClass = (destaque = false) =>
+  cx(
+    "rounded-sm underline-offset-4 transition-colors hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-revenido",
+    destaque ? "font-medium text-brasa-claro hover:text-brasa" : "text-aco-300 hover:text-aco-100",
+  );
 
 export function Table({ children }: { children: ReactNode }) {
   return (
