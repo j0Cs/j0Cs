@@ -166,6 +166,62 @@ export class GithubApp {
     return buf;
   }
 
+  /** Dados de um pull request (para a revisão de QA da Forja). */
+  async pullRequest(installationId: number, fullName: string, numero: number) {
+    const token = await this.tokenDaInstalacao(installationId);
+    const r = await this.req<{
+      number: number;
+      title: string;
+      body: string | null;
+      html_url: string;
+      state: string;
+      user: { login: string } | null;
+      head: { ref: string; sha: string; repo: { full_name: string } | null };
+      base: { ref: string; sha: string };
+      changed_files: number;
+    }>("GET", `/repos/${fullName}/pulls/${numero}`, { auth: `token ${token}` });
+    return {
+      numero: r.number,
+      titulo: r.title,
+      corpo: r.body ?? "",
+      url: r.html_url,
+      estado: r.state,
+      autor: r.user?.login ?? null,
+      headRef: r.head.ref,
+      headSha: r.head.sha,
+      headRepo: r.head.repo?.full_name ?? null,
+      baseRef: r.base.ref,
+      baseSha: r.base.sha,
+      arquivosAlterados: r.changed_files,
+    };
+  }
+
+  /** Arquivos alterados no PR com o patch de cada um (até 300 arquivos). */
+  async arquivosDoPR(installationId: number, fullName: string, numero: number) {
+    const token = await this.tokenDaInstalacao(installationId);
+    const todos: { arquivo: string; status: string; adicoes: number; remocoes: number; patch: string | null }[] = [];
+    for (let pagina = 1; pagina <= 3; pagina++) {
+      const r = await this.req<{ filename: string; status: string; additions: number; deletions: number; patch?: string }[]>(
+        "GET",
+        `/repos/${fullName}/pulls/${numero}/files?per_page=100&page=${pagina}`,
+        { auth: `token ${token}` },
+      );
+      todos.push(...r.map((f) => ({ arquivo: f.filename, status: f.status, adicoes: f.additions, remocoes: f.deletions, patch: f.patch ?? null })));
+      if (r.length < 100) break;
+    }
+    return todos;
+  }
+
+  /** Publica a revisão no PR como comentário de revisão (não aprova nem bloqueia). */
+  async comentarNoPR(installationId: number, fullName: string, numero: number, corpo: string, commitSha?: string | null) {
+    const token = await this.tokenDaInstalacao(installationId);
+    const r = await this.req<{ html_url: string }>("POST", `/repos/${fullName}/pulls/${numero}/reviews`, {
+      auth: `token ${token}`,
+      corpo: { body: corpo, event: "COMMENT", ...(commitSha ? { commit_id: commitSha } : {}) },
+    });
+    return { url: r.html_url };
+  }
+
   /** Conteúdo de um arquivo num commit (texto), ou null se não existir. */
   async arquivo(installationId: number, fullName: string, path: string, ref: string) {
     const token = await this.tokenDaInstalacao(installationId);

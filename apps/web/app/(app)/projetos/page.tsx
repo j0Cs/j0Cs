@@ -105,7 +105,7 @@ export default async function ProjectsPage() {
                 ))}
               </select>
             </Field>
-            <Field label="Repositório GitHub" hint="owner/repo — a integração completa chega com o GitHub App.">
+            <Field label="Repositório GitHub (opcional)" hint="dono/repo. Depois, em Repositório no projeto, você escolhe da lista e a Forja lê a estrutura.">
               <input name="repoFullName" className={inputClass} placeholder="minha-empresa/meu-app" />
             </Field>
             <Field label="Instruções do projeto" hint="Vão em todas as conversas (e ficam em cache, então custam pouco).">

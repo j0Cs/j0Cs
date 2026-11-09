@@ -4,13 +4,13 @@ import { encryptSecret, secretHint } from "@forja/core/server";
 import { and, eq, schema } from "@forja/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { CONNECTORS, verifyConnector, type ConnectorType } from "@/lib/connectors";
+import { CONNECTORS, verifyConnector } from "@/lib/connectors";
 import { canManage, getSession } from "@/lib/session";
 
 export async function connect(formData: FormData) {
   const { db, org, role } = await getSession();
   if (!canManage(role)) redirect(`/conectores?erro=${encodeURIComponent("Só donos e administradores gerenciam conectores.")}`);
-  const type = String(formData.get("type")) as ConnectorType;
+  const type = String(formData.get("type") ?? "");
   const credential = String(formData.get("credential") ?? "").trim();
   const def = CONNECTORS.find((c) => c.type === type && c.available && !c.href);
   if (!def || !credential) redirect(`/conectores?erro=${encodeURIComponent("Preencha a credencial.")}`);

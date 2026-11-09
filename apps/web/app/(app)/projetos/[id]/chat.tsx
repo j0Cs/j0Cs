@@ -9,6 +9,15 @@ import { useEffect, useRef, useState } from "react";
 import { usageMeta } from "@/lib/format";
 import type { ModelOption } from "@/lib/models";
 
+/** Especialistas do time Forja (as instruções ficam no servidor). */
+const PAPEIS = [
+  { id: "", label: "Assistente" },
+  { id: "dev_senior", label: "Dev Sênior" },
+  { id: "dev_pleno", label: "Dev Pleno" },
+  { id: "qa_pleno", label: "QA Pleno" },
+  { id: "seguranca_pleno", label: "Cyber Security" },
+];
+
 interface Msg {
   id: string;
   role: "user" | "assistant";
@@ -52,6 +61,7 @@ export function Chat(props: {
   const [input, setInput] = useState("");
   const [modelId, setModelId] = useState(props.defaultModelId);
   const [effort, setEffort] = useState<(typeof EFFORTS)[number]["id"]>("high");
+  const [persona, setPersona] = useState("");
   const [busy, setBusy] = useState(false);
   const conversationId = useRef(props.conversationId);
   const abort = useRef<AbortController | null>(null);
@@ -103,6 +113,7 @@ export function Chat(props: {
           conversationId: conversationId.current,
           modelId,
           effort,
+          persona: persona || undefined,
           message: responderUltima ? undefined : text,
           responderUltima,
         }),
@@ -170,6 +181,19 @@ export function Chat(props: {
               </optgroup>
             ) : null,
           )}
+        </select>
+        <select
+          value={persona}
+          onChange={(e) => setPersona(e.target.value)}
+          className={cx(inputBaseClass, "w-auto py-1.5 text-xs")}
+          aria-label="Falar com"
+          title="Especialista do time Forja que responde"
+        >
+          {PAPEIS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
         </select>
         <div className="flex rounded-lg border border-zinc-200 p-0.5" role="radiogroup" aria-label="Profundidade">
           {EFFORTS.map((e) => (

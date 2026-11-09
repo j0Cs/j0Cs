@@ -22,6 +22,8 @@ São dois produtos sobre o mesmo núcleo:
 7. [Central e modo call](docs/07-central-e-modo-call.md): experiência imersiva e o agente de voz
 8. [Cobrança com o Stripe](docs/08-cobranca-stripe.md): assinatura, recarga por Pix, inadimplência e o que configurar
 9. [Agente v1 com GitHub](docs/09-agente-github.md): do pedido ao pull request, limites e o GitHub App
+10. [Operação e incidentes](docs/10-operacao-e-incidentes.md): alertas, backup, rotação de chaves e plano de incidente
+11. [Assinatura do cliente, time e QA](docs/11-assistentes-auditoria-e-time.md): time de especialistas, auditoria, revisão de PR, telemetria e conectores
 
 Prompts prontos para o Cowork: [login com GitHub](docs/cowork/01-github-login.md) ·
 [e-mail no Microsoft 365](docs/cowork/02-microsoft-365-email.md)

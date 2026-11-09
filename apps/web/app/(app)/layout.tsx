@@ -1,7 +1,7 @@
 import { bloqueioDaOrg, CARENCIA_INADIMPLENCIA_DIAS, diasRestantesDoTeste, formatBrlMicros, TRIAL_PLAN_ID } from "@forja/core";
 import { Notice } from "@forja/ui";
 import { Shell } from "@forja/ui/shell";
-import { Bot, CreditCard, FolderKanban, Gauge, LogOut, Orbit, Plug, Users } from "lucide-react";
+import { Bot, BrainCircuit, CreditCard, FolderKanban, Gauge, LogOut, Orbit, Plug, Users } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/session";
@@ -24,6 +24,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         { href: "/central", label: "Central", icon: <Orbit size={16} /> },
         { href: "/projetos", label: "Projetos", icon: <FolderKanban size={16} /> },
         { href: "/agente", label: "Agente", icon: <Bot size={16} /> },
+        { href: "/assistentes", label: "Assistentes de IA", icon: <BrainCircuit size={16} /> },
         { href: "/conectores", label: "Conectores", icon: <Plug size={16} /> },
         { href: "/custos", label: "Custos e uso", icon: <Gauge size={16} /> },
         { href: "/equipe", label: "Equipe", icon: <Users size={16} /> },

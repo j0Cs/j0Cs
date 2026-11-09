@@ -286,6 +286,9 @@ export const projects = pgTable(
     /** Instruções fixas do projeto (vão no system prompt e ficam em cache). */
     instructions: text("instructions").notNull().default(""),
     repoFullName: text("repo_full_name"),
+    /** Estrutura do repositório lida pelo GitHub App (linguagens, stack, árvore, README). */
+    repoSnapshot: jsonb("repo_snapshot").$type<Record<string, unknown>>(),
+    repoSnapshotAt: timestamp("repo_snapshot_at", { withTimezone: true }),
     createdBy: uuid("created_by").references(() => users.id),
     createdAt: createdAt(),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
@@ -519,6 +522,8 @@ export const agentTasks = pgTable(
     projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     title: text("title").notNull(),
+    /** mudanca (vira PR) | auditoria (só lê e entrega um relatório) */
+    kind: text("kind").notNull().default("mudanca"),
     request: text("request").notNull(),
     installationId: bigint("installation_id", { mode: "number" }).notNull(),
     repoFullName: text("repo_full_name").notNull(),
@@ -542,6 +547,8 @@ export const agentTasks = pgTable(
     prUrl: text("pr_url"),
     prNumber: integer("pr_number"),
     stopRequested: boolean("stop_requested").notNull().default(false),
+    /** Auditoria: achados da varredura automática e do agente, resumo e notas por categoria. */
+    report: jsonb("report").$type<Record<string, unknown>>(),
     /** Conversa de onde a tarefa saiu (os links de PR e preview voltam para ela). */
     conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
     /** Vercel: projeto ligado ao repositório e o preview da branch do PR. */
@@ -640,4 +647,60 @@ export const costReconciliations = pgTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("cost_reconciliations_dia_provedor").on(t.day, t.providerId)],
+);
+
+// ---------------------------------------------------------------------------
+// Assistentes de IA do cliente (Sprint 4b): telemetria do Claude Code, Codex, Gemini CLI e Grok Build
+// ---------------------------------------------------------------------------
+
+/** Uma ferramenta que manda o próprio uso para a Forja (token de envio próprio, guardado só o hash). */
+export const aiTelemetrySources = pgTable(
+  "ai_telemetry_sources",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    /** claude_code | codex | gemini_cli | grok_build */
+    tool: text("tool").notNull(),
+    label: text("label").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    tokenHint: text("token_hint").notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("ai_telemetry_sources_token_idx").on(t.tokenHash), index("ai_telemetry_sources_org_idx").on(t.orgId)],
+);
+
+/** Uma requisição ao modelo feita pela ferramenta do cliente (sem prompt nem resposta). */
+export const aiUsageEvents = pgTable(
+  "ai_usage_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    sourceId: uuid("source_id").notNull().references(() => aiTelemetrySources.id, { onDelete: "cascade" }),
+    tool: text("tool").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    model: text("model").notNull().default(""),
+    /** Entrada sem cache (o que paga preço cheio). */
+    inputTokens: bigint("input_tokens", { mode: "number" }).notNull().default(0),
+    outputTokens: bigint("output_tokens", { mode: "number" }).notNull().default(0),
+    cacheReadTokens: bigint("cache_read_tokens", { mode: "number" }).notNull().default(0),
+    cacheWriteTokens: bigint("cache_write_tokens", { mode: "number" }).notNull().default(0),
+    reasoningTokens: bigint("reasoning_tokens", { mode: "number" }).notNull().default(0),
+    /** Estimativa da própria ferramenta (preço de tabela), quando ela informa. */
+    costUsdMicros: bigint("cost_usd_micros", { mode: "number" }),
+    durationMs: integer("duration_ms"),
+    sessionId: text("session_id"),
+    /** main | subagent | auxiliary (Claude Code) */
+    querySource: text("query_source"),
+    actor: text("actor"),
+    /** Evita contar duas vezes quando o exportador reenvia o mesmo lote. */
+    fingerprint: text("fingerprint").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("ai_usage_events_dedupe_idx").on(t.sourceId, t.fingerprint),
+    index("ai_usage_events_org_time_idx").on(t.orgId, t.occurredAt),
+  ],
 );

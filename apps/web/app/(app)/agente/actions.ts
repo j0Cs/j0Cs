@@ -3,6 +3,12 @@
 import {
   aplicarMigracoes,
   aprovarTarefa,
+  CATEGORIAS,
+  type Achado,
+  comentarRevisaoNoPR,
+  type FerramentaDoTime,
+  instalarTimeNoRepositorio,
+  type Persona,
   conectorDaOrg,
   criarProjetoSupabase,
   criarTarefa,
@@ -12,7 +18,7 @@ import {
   publicarPreview,
   RegraDoAgente,
 } from "@forja/agent";
-import { consumeRateLimit, eq, schema } from "@forja/db";
+import { and, consumeRateLimit, eq, schema } from "@forja/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
@@ -48,6 +54,149 @@ export async function criarTarefaAction(_: FormState, f: FormData): Promise<Form
     if (e instanceof RegraDoAgente) return { error: e.message };
     console.error(JSON.stringify({ level: "error", msg: "criar tarefa falhou", err: String(e) }));
     return { error: "Não consegui falar com o GitHub agora. Tente de novo em instantes." };
+  }
+  after(() => rodarTarefa(db, gh, id));
+  redirect(`/agente/${id}`);
+}
+
+/** Auditoria: o agente só lê o repositório e entrega um relatório (custo medido como qualquer tarefa). */
+export async function criarAuditoriaAction(_: FormState, f: FormData): Promise<FormState> {
+  const { db, org, user } = await getSession();
+  if (!user.emailVerified) return { error: "Confirme seu e-mail antes de usar o agente." };
+  if (!(await consumeRateLimit(db, `agente:criar:${org.id}`, 30, 3600))) return { error: "Muitas tarefas na última hora. Tente mais tarde." };
+  const gh = await githubApp();
+  if (!gh) return { error: "O GitHub ainda não está configurado na Forja. Fale com o suporte." };
+  let id: string;
+  try {
+    const { tarefa } = await criarTarefa(db, gh, {
+      org,
+      userId: user.id,
+      kind: "auditoria",
+      personas: f.getAll("persona").map(String) as Persona[],
+      repoFullName: String(f.get("repo") ?? ""),
+      pedido: String(f.get("foco") ?? "").slice(0, 2_000),
+      modelId: String(f.get("modelo") ?? ""),
+      tetoBrlMicros: reais(f.get("teto")),
+      projectId: String(f.get("projeto") ?? "") || null,
+    });
+    id = tarefa.id;
+  } catch (e) {
+    if (e instanceof RegraDoAgente) return { error: e.message };
+    console.error(JSON.stringify({ level: "error", msg: "criar auditoria falhou", err: String(e) }));
+    return { error: "Não consegui falar com o GitHub agora. Tente de novo em instantes." };
+  }
+  after(() => rodarTarefa(db, gh, id));
+  redirect(`/agente/${id}`);
+}
+
+/** Revisão de QA de um pull request (o código pode ter vindo do Claude Code, Codex etc. do cliente). */
+export async function criarRevisaoAction(_: FormState, f: FormData): Promise<FormState> {
+  const { db, org, user } = await getSession();
+  if (!user.emailVerified) return { error: "Confirme seu e-mail antes de usar o agente." };
+  const pr = Number(String(f.get("pr") ?? "").replace(/^#/, "").trim());
+  if (!Number.isInteger(pr) || pr < 1) return { error: "Informe o número do pull request (ex.: 42)." };
+  if (!(await consumeRateLimit(db, `agente:criar:${org.id}`, 30, 3600))) return { error: "Muitas tarefas na última hora. Tente mais tarde." };
+  const gh = await githubApp();
+  if (!gh) return { error: "O GitHub ainda não está configurado na Forja. Fale com o suporte." };
+  let id: string;
+  try {
+    const { tarefa } = await criarTarefa(db, gh, {
+      org,
+      userId: user.id,
+      kind: "revisao",
+      pr,
+      personas: f.getAll("persona").map(String) as Persona[],
+      repoFullName: String(f.get("repo") ?? ""),
+      pedido: String(f.get("foco") ?? "").slice(0, 2_000),
+      modelId: String(f.get("modelo") ?? ""),
+      tetoBrlMicros: reais(f.get("teto")),
+      projectId: String(f.get("projeto") ?? "") || null,
+    });
+    id = tarefa.id;
+  } catch (e) {
+    if (e instanceof RegraDoAgente) return { error: e.message };
+    console.error(JSON.stringify({ level: "error", msg: "criar revisão falhou", err: String(e) }));
+    return { error: "Não consegui falar com o GitHub agora. Tente de novo em instantes." };
+  }
+  after(() => rodarTarefa(db, gh, id));
+  redirect(`/agente/${id}`);
+}
+
+/** Publica a revisão concluída no pull request, como comentário de revisão. */
+export async function comentarNoPRAction(id: string): Promise<{ erro?: string; url?: string }> {
+  const { db, org, user } = await getSession();
+  if (!user.emailVerified) return { erro: "Confirme seu e-mail antes." };
+  if (!(await consumeRateLimit(db, `agente:comentar:${org.id}`, 30, 3600))) return { erro: "Muitas publicações na última hora. Tente mais tarde." };
+  const gh = await githubApp();
+  if (!gh) return { erro: "O GitHub ainda não está configurado na Forja." };
+  try {
+    const c = await comentarRevisaoNoPR(db, gh, org.id, id);
+    revalidatePath(`/agente/${id}`);
+    return { url: c.url };
+  } catch (e) {
+    if (e instanceof RegraDoAgente) return { erro: e.message };
+    console.error(JSON.stringify({ level: "error", msg: "comentar no PR falhou", err: String(e) }));
+    return { erro: "Não consegui publicar no GitHub agora. Tente de novo." };
+  }
+}
+
+/** Abre um PR no repositório do projeto com os arquivos do time para as ferramentas do cliente. */
+export async function instalarTimeAction(_: FormState, f: FormData): Promise<FormState> {
+  const { db, org, user, role } = await getSession();
+  if (!canManage(role)) return { error: "Só donos e administradores instalam o time no repositório." };
+  if (!user.emailVerified) return { error: "Confirme seu e-mail antes." };
+  if (!(await consumeRateLimit(db, `agente:time:${org.id}`, 10, 3600))) return { error: "Muitas tentativas na última hora. Tente mais tarde." };
+  const gh = await githubApp();
+  if (!gh) return { error: "O GitHub ainda não está configurado na Forja." };
+  try {
+    const pr = await instalarTimeNoRepositorio(db, gh, {
+      orgId: org.id,
+      repoFullName: String(f.get("repo") ?? ""),
+      ferramentas: f.getAll("ferramenta").map(String) as FerramentaDoTime[],
+    });
+    return { ok: `Pull request aberto: ${pr.url}` };
+  } catch (e) {
+    if (e instanceof RegraDoAgente) return { error: e.message };
+    console.error(JSON.stringify({ level: "error", msg: "instalar time falhou", err: String(e) }));
+    return { error: "Não consegui abrir o pull request agora. Tente de novo." };
+  }
+}
+
+/** Da auditoria para a correção: os achados escolhidos viram o pedido de uma tarefa de mudança. */
+export async function corrigirAchadosAction(auditoriaId: string, chaves: string[]): Promise<{ erro?: string }> {
+  const { db, org, user } = await getSession();
+  if (!user.emailVerified) return { erro: "Confirme seu e-mail antes de usar o agente." };
+  const t = await db.query.agentTasks.findFirst({ where: and(eq(schema.agentTasks.id, auditoriaId), eq(schema.agentTasks.orgId, org.id)) });
+  if (!t || t.kind !== "auditoria") return { erro: "Auditoria não encontrada." };
+  const r = (t.report ?? {}) as { varredura?: Achado[]; achados?: Achado[] };
+  const escolhidos = chaves
+    .slice(0, 15)
+    .map((c) => {
+      const [origem, i] = c.split(":");
+      return (origem === "varredura" ? r.varredura : r.achados)?.[Number(i)];
+    })
+    .filter((a): a is Achado => Boolean(a));
+  if (!escolhidos.length) return { erro: "Escolha pelo menos um achado." };
+  const pedido = [
+    `Corrija estes pontos encontrados na auditoria de ${t.repoFullName}. Mantenha o estilo do projeto e não mude o que não for preciso.`,
+    "",
+    ...escolhidos.map(
+      (a, n) =>
+        `${n + 1}. [${CATEGORIAS[a.categoria]} · ${a.severidade}] ${a.titulo}${a.arquivo ? ` (${a.arquivo}${a.linha ? `:${a.linha}` : ""})` : ""}\n   Problema: ${a.detalhe}\n   O que fazer: ${a.recomendacao}`,
+    ),
+    "",
+    "Segredos expostos: não basta apagar do código. Mova para variáveis de ambiente e diga no resumo que a chave precisa ser trocada no serviço.",
+  ].join("\n");
+  if (!(await consumeRateLimit(db, `agente:criar:${org.id}`, 30, 3600))) return { erro: "Muitas tarefas na última hora. Tente mais tarde." };
+  const gh = await githubApp();
+  if (!gh) return { erro: "O GitHub ainda não está configurado na Forja." };
+  let id: string;
+  try {
+    const { tarefa } = await criarTarefa(db, gh, { org, userId: user.id, repoFullName: t.repoFullName, pedido, modelId: t.modelId, projectId: t.projectId });
+    id = tarefa.id;
+  } catch (e) {
+    if (e instanceof RegraDoAgente) return { erro: e.message };
+    return { erro: "Não consegui criar a tarefa agora. Tente de novo." };
   }
   after(() => rodarTarefa(db, gh, id));
   redirect(`/agente/${id}`);

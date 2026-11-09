@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { STATUS_DA_TAREFA } from "@/lib/agente-ui";
 import { aprovarTarefaAction, descartarTarefaAction, pararTarefaAction } from "../actions";
+import { RelatorioDaAuditoria, type Relatorio } from "./relatorio";
 
 interface Passo {
   idx: number;
@@ -33,6 +34,9 @@ interface Tarefa {
   passos: number;
   arquivosAlterados: number;
   parando: boolean;
+  tipo: string;
+  relatorio: Record<string, unknown> | null;
+  baseSha: string | null;
 }
 interface ArquivoDoDiff {
   path: string;
@@ -58,7 +62,12 @@ function iconeDoPasso(p: Passo) {
     case "apagar_arquivo":
       return <Trash2 size={14} className="text-red-600" />;
     case "concluir":
+    case "concluir_auditoria":
       return <Check size={14} className="text-green-600" />;
+    case "registrar_achado":
+      return <TriangleAlert size={14} className="text-amber-600" />;
+    case "varredura":
+      return <Search size={14} className="text-zinc-500" />;
     default:
       return <Pencil size={14} className="text-brand-600" />;
   }
@@ -227,9 +236,23 @@ export function TarefaAoVivo({ inicial }: { inicial: { tarefa: Tarefa; passos: P
         <div ref={fimDaLista} />
       </Card>
 
+      {tarefa.tipo === "auditoria" || tarefa.tipo === "revisao" ? (
+        <RelatorioDaAuditoria
+          taskId={tarefa.id}
+          tipo={tarefa.tipo}
+          repo={tarefa.repo}
+          sha={tarefa.baseSha}
+          relatorio={(tarefa.relatorio ?? {}) as Relatorio}
+          emAndamento={EM_ANDAMENTO.has(tarefa.status)}
+        />
+      ) : null}
+
       {tarefa.resumo ? (
         <Card>
-          <CardHeader title={tarefa.tituloPr ?? "Resumo"} description="Vai na descrição do pull request." />
+          <CardHeader
+            title={tarefa.tipo === "auditoria" ? "Resumo da auditoria" : tarefa.tipo === "revisao" ? "Resumo da revisão" : (tarefa.tituloPr ?? "Resumo")}
+            description={tarefa.tipo === "mudanca" ? "Vai na descrição do pull request." : undefined}
+          />
           <p className="whitespace-pre-wrap px-5 pb-5 text-sm text-zinc-700">{tarefa.resumo}</p>
         </Card>
       ) : null}

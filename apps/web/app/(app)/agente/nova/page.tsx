@@ -67,7 +67,7 @@ export default async function NovaTarefaPage({ searchParams }: { searchParams: P
           </Link>
         }
       />
-      {projetoDaCall ? (
+      {projetoDaCall?.instructions ? (
         <div className="mb-4">
           <Notice tone="blue">
             A especificação da call do projeto <b>{projetoDaCall.name}</b> já está no pedido. Escolha o repositório (pode ser um vazio, criado agora no GitHub) e

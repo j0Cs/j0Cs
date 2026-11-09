@@ -16,6 +16,7 @@
     "@forja/billing": "workspace:*",
     "@forja/core": "workspace:*",
     "@forja/db": "workspace:*",
+    "@forja/insights": "workspace:*",
     "@forja/ops": "workspace:*",
     "@forja/ui": "workspace:*",
     "@vercel/functions": "^3.10.6",

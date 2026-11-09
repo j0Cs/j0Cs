@@ -14,12 +14,30 @@ export interface RepoSimulado {
   private?: boolean;
 }
 
+/** Pull request simulado: o head tem os próprios arquivos (servidos pelo tarball do headSha). */
+export interface PullSimulado {
+  numero: number;
+  titulo: string;
+  corpo: string;
+  autor: string;
+  headRef: string;
+  headSha: string;
+  headRepo: string;
+  baseRef: string;
+  baseSha: string;
+  arquivos: Record<string, string>;
+  alterados: { filename: string; status: string; additions: number; deletions: number; patch?: string }[];
+}
+
 export interface GithubSimulado {
   url: string;
   repos: Map<string, RepoSimulado & { sha: string | null }>;
   arvores: Map<string, { base: string | null; entradas: { path: string; content?: string; sha?: string | null }[] }>;
   refs: Map<string, string>;
   prs: { repo: string; title: string; head: string; base: string; body: string; number: number }[];
+  /** chave: "dono/repo#numero" */
+  pulls: Map<string, PullSimulado>;
+  revisoes: { repo: string; numero: number; body: string; event: string; commit_id: string | null }[];
   chamadas: string[];
   /** instalações que o usuário do OAuth enxerga */
   instalacoesDoUsuario: number[];
@@ -36,6 +54,8 @@ export async function iniciarGithubSimulado(opts: { porta: number; chavePublica:
     arvores: new Map(),
     refs: new Map(),
     prs: [],
+    pulls: new Map(),
+    revisoes: [],
     chamadas: [],
     instalacoesDoUsuario: [opts.installationId],
   };
@@ -99,6 +119,8 @@ export async function iniciarGithubSimulado(opts: { porta: number; chavePublica:
       return sha ? responder(200, { object: { sha } }) : responder(404, { message: "Not Found" });
     }
     if ((m = resto.match(/^\/tarball\/(.+)$/))) {
+      const doPR = [...estado.pulls.values()].find((x) => x.headRepo === repo.fullName && x.headSha === m![1]);
+      if (doPR) return responder(200, tarGz(doPR.arquivos, `${repo.fullName.replace("/", "-")}-${doPR.headSha}`));
       if (m[1] !== repo.sha || !repo.arquivos) return responder(404, { message: "Not Found" });
       return responder(200, tarGz(repo.arquivos, `${repo.fullName.replace("/", "-")}-${repo.sha}`));
     }
@@ -125,6 +147,26 @@ export async function iniciarGithubSimulado(opts: { porta: number; chavePublica:
       if (estado.refs.has(chave)) return responder(422, { message: "Reference already exists" });
       estado.refs.set(chave, String(json.sha));
       return responder(201, { ref: json.ref });
+    }
+    if ((m = resto.match(/^\/pulls\/(\d+)(\/files|\/reviews)?$/))) {
+      const pull = estado.pulls.get(`${repo.fullName}#${m[1]}`);
+      if (!pull) return responder(404, { message: "Not Found" });
+      if (m[2] === "/files") return responder(200, u.searchParams.get("page") === "1" || !u.searchParams.get("page") ? pull.alterados : []);
+      if (m[2] === "/reviews" && req.method === "POST") {
+        estado.revisoes.push({ repo: repo.fullName, numero: pull.numero, body: String(json.body), event: String(json.event), commit_id: (json.commit_id as string) ?? null });
+        return responder(200, { html_url: `https://github.com/${repo.fullName}/pull/${pull.numero}#pullrequestreview-${estado.revisoes.length}` });
+      }
+      return responder(200, {
+        number: pull.numero,
+        title: pull.titulo,
+        body: pull.corpo,
+        html_url: `https://github.com/${repo.fullName}/pull/${pull.numero}`,
+        state: "open",
+        user: { login: pull.autor },
+        head: { ref: pull.headRef, sha: pull.headSha, repo: { full_name: pull.headRepo } },
+        base: { ref: pull.baseRef, sha: pull.baseSha },
+        changed_files: pull.alterados.length,
+      });
     }
     if (resto === "/pulls" && req.method === "POST") {
       const numero = estado.prs.length + 1;

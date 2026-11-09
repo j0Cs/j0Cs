@@ -94,6 +94,9 @@ export default async function TarefaPage({ params }: { params: Promise<{ id: str
             passos: t.stepCount,
             arquivosAlterados: arquivos?.n ?? 0,
             parando: t.stopRequested,
+      tipo: t.kind,
+      relatorio: t.kind === "auditoria" || t.kind === "revisao" ? t.report : null,
+      baseSha: t.baseSha,
           },
           passos,
         }}

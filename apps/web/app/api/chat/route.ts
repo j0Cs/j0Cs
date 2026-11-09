@@ -1,3 +1,4 @@
+import { ehPersona, instrucoesDaConversa, resumoDaEstrutura, type EstruturaDoRepositorio } from "@forja/agent";
 import type { ChatMessage } from "@forja/core";
 import { verificarSaldoBaixo } from "@forja/billing";
 import { authorize, GatewayError, runChat, type Effort } from "@forja/core/server";
@@ -30,6 +31,8 @@ export async function POST(request: Request) {
     conversationId?: string | null;
     modelId?: string;
     effort?: string;
+    /** Papel do time Forja na conversa (dev_senior, dev_pleno, qa_pleno, seguranca_pleno). */
+    persona?: string;
     message?: string;
     /** "call" = chamada de voz: respostas curtas, faladas, sem markdown. */
     modo?: string;
@@ -99,7 +102,10 @@ export async function POST(request: Request) {
 
   const call = body.modo === "call";
   const base = call ? callSystemPrompt(firstName(user.name)) : BASE_SYSTEM;
-  const system = project.instructions ? `${base}\n\nInstruções do projeto:\n${project.instructions}` : base;
+  // estrutura do repositório ligado ao projeto: um resumo curto (fica no prefixo em cache)
+  const repo = project.repoSnapshot ? `\n\nRepositório do projeto: ${resumoDaEstrutura(project.repoSnapshot as unknown as EstruturaDoRepositorio)}` : "";
+  const papel = !call && ehPersona(body.persona) ? `\n\n${instrucoesDaConversa(body.persona)}` : "";
+  const system = (project.instructions ? `${base}\n\nInstruções do projeto:\n${project.instructions}` : base) + repo + papel;
   const effort = EFFORTS.includes(body.effort as Effort) ? (body.effort as Effort) : call ? "low" : undefined;
   const encoder = new TextEncoder();
 

@@ -1,6 +1,6 @@
 # 4. Roadmap até o lançamento (janeiro/2027)
 
-Atualizado em **05/11/2026**. Meta: **beta fechado em 04/01/2027** e **lançamento público por volta de 20/01/2027**.
+Atualizado em **09/11/2026**. Meta: **beta fechado em 04/01/2027** e **lançamento público por volta de 20/01/2027**.
 São cerca de 7 semanas úteis de construção antes do recesso. Sprints de 1 a 2 semanas, cada uma terminando com algo
 que funciona em produção (staging).
 
@@ -132,6 +132,55 @@ Objetivo: o código do agente sai do PR e vira um site no ar, e o dono enxerga p
 Pronto quando: do chat, o agente abre o PR, a Vercel publica o preview e o link aparece na conversa; um alerta de
 teste chega ao dono por e-mail; o backup é restaurado num banco separado.
 
+## Sprint 4b: Assinatura do cliente, time de especialistas e QA ✅ (09/11)
+
+Objetivo: o cliente constrói com a própria assinatura (Claude Code, Codex, Gemini CLI, Grok Build) e a Forja entra
+como time de especialistas e QA (doc 11).
+
+- [x] **[Claude]** Botão **Conectar repositório** no projeto: estrutura, stack, pastas, instruções de IA e README, usados
+  no chat e na call
+- [x] **[Claude]** **Time de especialistas**: Dev Sênior, Dev Pleno, QA Pleno e Cyber Security Pleno. São usados na
+  auditoria, na revisão de PR, no chat ("Falar com") e no agente. Também são instalados no repositório do cliente por
+  PR: subagentes e skills do Claude Code, `AGENTS.md`, `GEMINI.md` e comandos do Gemini CLI
+- [x] **[Claude]** **Auditoria** do projeto (só leitura, varredura grátis, parecer de cada papel, notas, "Corrigir com o
+  agente") e **revisão de QA de pull request** com veredito e publicação no PR
+- [x] **[Claude]** **Assistentes de IA**: telemetria OTLP das quatro ferramentas, painel de uso, recomendações de
+  economia e gasto real com chave de administração (Anthropic e OpenAI)
+- [x] **[Claude]** Conectores novos com verificação: GitLab, Bitbucket, Azure DevOps, Netlify, Cloudflare, Railway,
+  Render, Fly.io, Neon, Turso, PlanetScale e as chaves de administração
+- [ ] **[Você]** Domínio próprio (a telemetria dos clientes não passa pela Vercel Authentication dos `*.vercel.app`)
+
+Login de assinatura dentro da Forja **não** entra: os termos da Anthropic e da Google proíbem, e a OpenAI só permite
+para parceiros aprovados (doc 11, seção 1).
+
+## Sprints D1 e D2: App desktop da Forja (macOS Intel e Apple Silicon, Windows), últimas de construção
+
+Objetivo: o mesmo produto num app instalável, com o que só dá para fazer na máquina do cliente. Fica para as últimas
+sprints, depois do núcleo web. Com o adiantamento das Sprints 3 e 4, cabe antes do beta, e o desktop entra no beta.
+
+- [ ] **[Claude]** Base: **Electron** carregando o app web, com janela, menu, bandeja, notificações, link `forja://`
+  e login pelo navegador. Electron em vez de Tauri porque reaproveita direto o código TypeScript que já existe (leitura
+  de estrutura, varredura, time, configuração da telemetria)
+- [ ] **[Claude]** Recursos locais:
+  - abrir uma pasta do computador e ler a estrutura sem GitHub;
+  - instalar o time nos arquivos locais;
+  - **configurar a telemetria** do Claude Code, do Codex e do Gemini CLI com um clique (edita `~/.claude/settings.json`,
+    `~/.codex/config.toml` etc., mostrando antes o que muda);
+  - auditoria e revisão da branch local.
+
+  As ferramentas do cliente continuam rodando por conta própria: o app não dirige o Claude Code com a assinatura do
+  cliente, o que os termos também proíbem
+- [ ] **[Claude]** Builds e CI: GitHub Actions com macOS arm64 e x64 (`.dmg` de cada um ou universal) e Windows x64
+  (instalador NSIS; arm64 se houver demanda). Atualização automática pelos releases
+- [ ] **[Você]** Conta **Apple Developer** (US$ 99/ano) para assinar e notarizar no macOS. Sem isso o Gatekeeper
+  bloqueia o app
+- [ ] **[Você]** Certificado de **assinatura de código do Windows** (Azure Trusted Signing, cerca de US$ 10/mês, ou um
+  certificado OV/EV). Sem isso o SmartScreen avisa "editor desconhecido"
+- [ ] **[Claude]** Página de download que detecta o sistema e o processador
+
+Pronto quando: o app instala e abre assinado no Mac (Intel e M1 ou mais novo) e no Windows; configura a telemetria do
+Claude Code local com um clique; e atualiza sozinho para uma versão nova.
+
 ## Recesso (24/12 → 03/01)
 
 Congelamento: só correção de bugs. Bom momento para gravar vídeos de demonstração e revisar a landing page.
@@ -163,6 +212,7 @@ Landing page, conteúdo (comparativos de modelos em português, tutoriais) e com
 | CNPJ e regime tributário | 20/11 | Stripe verificado e NFS-e dependem disso |
 | Plano Pro da Vercel | 14/12 | Voz em nuvem e uso comercial; o Hobby proíbe uso comercial |
 | Oferta de fundador do beta | 18/12 | Cupom e convites prontos antes do recesso |
+| Conta Apple Developer e certificado de código do Windows | antes das Sprints D1 e D2 | O app desktop só instala sem alertas se for assinado |
 
 ## Depois do lançamento (fevereiro a abril)
 
@@ -170,7 +220,7 @@ Landing page, conteúdo (comparativos de modelos em português, tutoriais) e com
 2. **Roteamento inteligente**: o sistema sugere ou escolhe o modelo mais barato que resolve a tarefa
 3. **Automações**: tarefas agendadas e por webhook (ex.: "toda segunda, revise os PRs abertos")
 4. **BYOK** no self-service e plano Enterprise com SSO
-5. Mais conectores: Netlify, Railway, Jira, Linear, Slack, Notion
+5. Mais conectores no agente: deploy pela Netlify, Railway e Render (já verificados na Sprint 4b), Jira, Linear, Slack e Notion
 
 ## Riscos e como mitigar
 

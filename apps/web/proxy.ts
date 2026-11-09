@@ -6,7 +6,8 @@ import { NextResponse, type NextRequest } from "next/server";
  * (sessão no banco, organização, papel) acontece em lib/session.ts em cada página/ação.
  */
 // /api/cron é protegida pelo CRON_SECRET (a Vercel envia no cabeçalho) e o webhook do Stripe pela
-// assinatura do evento (STRIPE_WEBHOOK_SECRET), não por sessão. /precos é a página pública de preços.
+// assinatura do evento (STRIPE_WEBHOOK_SECRET), não por sessão. /api/otlp recebe a telemetria dos
+// assistentes de IA, autenticada pelo token de envio de cada fonte. /precos é a página pública de preços.
 const PUBLIC = [
   "/entrar",
   "/cadastro",
@@ -17,6 +18,7 @@ const PUBLIC = [
   "/api/auth",
   "/api/cron",
   "/api/stripe/webhook",
+  "/api/otlp",
 ];
 
 export function proxy(request: NextRequest) {

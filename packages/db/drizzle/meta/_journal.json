@@ -57,6 +57,13 @@
       "when": 1794228390313,
       "tag": "0007_operacao",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794261350726,
+      "tag": "0008_assistentes_auditoria",
+      "breakpoints": true
     }
   ]
 }

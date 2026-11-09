@@ -74,6 +74,13 @@ export default async function ProjectPage({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/projetos/${project.id}/repositorio`}
+            className={buttonClass(project.repoFullName ? "ghost" : "secondary", "sm")}
+            title="Ligar o repositório do GitHub, ver a estrutura e analisar o projeto"
+          >
+            <FolderGit2 size={14} /> {project.repoFullName ? "Repositório" : "Conectar repositório"}
+          </Link>
           {active ? (
             <Link
               href={`/agente/nova?conversa=${active.id}`}

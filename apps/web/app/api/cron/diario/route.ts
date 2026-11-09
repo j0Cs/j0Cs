@@ -1,5 +1,6 @@
 import { rotinaDiariaDeCobranca } from "@forja/billing";
 import { getDb } from "@forja/db";
+import { limparUsoAntigo } from "@forja/insights";
 import { rotinaDiariaDeOperacao } from "@forja/ops";
 
 export const runtime = "nodejs";
@@ -18,5 +19,9 @@ export async function GET(request: Request) {
   const db = getDb();
   const cobranca = await rotinaDiariaDeCobranca(db).catch((e) => ({ erro: String(e) }));
   const operacao = await rotinaDiariaDeOperacao(db).catch((e) => ({ erro: String(e) }));
-  return Response.json({ cobranca, operacao });
+  // uso dos assistentes de IA: guardado por 180 dias
+  const assistentes = await limparUsoAntigo(db)
+    .then((apagados) => ({ apagados }))
+    .catch((e) => ({ erro: String(e) }));
+  return Response.json({ cobranca, operacao, assistentes });
 }

@@ -194,3 +194,68 @@ export function executarFerramenta(ws: Workspace, chamada: AgentToolCall): Resul
     throw e;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Auditoria: só leitura, mais registrar achados e concluir com um relatório
+// ---------------------------------------------------------------------------
+
+const SO_LEITURA = new Set(["listar_arquivos", "ler_arquivo", "buscar"]);
+
+export const FERRAMENTAS_DE_AUDITORIA: AgentToolDef[] = [
+  ...FERRAMENTAS.filter((f) => SO_LEITURA.has(f.name)),
+  {
+    name: "registrar_achado",
+    description:
+      "Registra um problema ou oportunidade de melhoria encontrado no projeto. Um achado por chamada, com arquivo e linha quando houver. Não repita achados da varredura automática.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        categoria: { type: "string", enum: ["seguranca", "estrutura", "qualidade", "desempenho", "economia"] },
+        severidade: { type: "string", enum: ["critica", "alta", "media", "baixa", "info"] },
+        titulo: { type: "string", description: "Curto e específico, em português." },
+        detalhe: { type: "string", description: "O que está errado ou pode melhorar e por que importa (cenário concreto)." },
+        arquivo: { type: "string", description: "Caminho do arquivo, se houver." },
+        linha: { type: "integer", minimum: 1 },
+        recomendacao: { type: "string", description: "O que fazer, de forma prática." },
+        persona: { type: "string", enum: ["dev_senior", "dev_pleno", "qa_pleno", "seguranca_pleno"], description: "Papel do time que encontrou." },
+      },
+      required: ["categoria", "severidade", "titulo", "detalhe", "recomendacao"],
+    },
+  },
+  {
+    name: "concluir_auditoria",
+    description: "Termina a análise com um resumo executivo, o parecer de cada papel do time, uma nota de 0 a 10 por categoria e, em revisão de pull request, o veredito.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        resumo: { type: "string", description: "Resumo em português: estado geral, os 3 a 5 pontos mais importantes e por onde começar." },
+        notas: {
+          type: "object",
+          properties: {
+            seguranca: { type: "integer", minimum: 0, maximum: 10 },
+            estrutura: { type: "integer", minimum: 0, maximum: 10 },
+            qualidade: { type: "integer", minimum: 0, maximum: 10 },
+            desempenho: { type: "integer", minimum: 0, maximum: 10 },
+            economia: { type: "integer", minimum: 0, maximum: 10 },
+          },
+        },
+        pareceres: {
+          type: "array",
+          description: "Um parecer curto por papel do time (o que ele viu de mais importante e o que recomenda primeiro).",
+          items: {
+            type: "object",
+            properties: {
+              persona: { type: "string", enum: ["dev_senior", "dev_pleno", "qa_pleno", "seguranca_pleno"] },
+              parecer: { type: "string" },
+            },
+            required: ["persona", "parecer"],
+          },
+        },
+        veredito: { type: "string", enum: ["pode_seguir", "seguir_com_ajustes", "nao_seguir"], description: "Só em revisão de pull request." },
+      },
+      required: ["resumo"],
+    },
+  },
+];
+
+export const ferramentaDeLeitura = (nome: string) => SO_LEITURA.has(nome);

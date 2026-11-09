@@ -37,9 +37,14 @@ export default async function AgentePage({ searchParams }: { searchParams: Promi
         description="Peça uma mudança em português e receba um pull request pronto para revisar. O agente lê o repositório, faz as alterações numa cópia e só abre o PR depois que você aprova."
         actions={
           instalacao ? (
-            <Link href="/agente/nova" className={buttonClass("brand")}>
-              Nova tarefa
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/projetos" className={buttonClass("secondary")} title="Abra o projeto, ligue o repositório e clique em Analisar o projeto">
+                Auditar um projeto
+              </Link>
+              <Link href="/agente/nova" className={buttonClass("brand")}>
+                Nova tarefa
+              </Link>
+            </div>
           ) : null
         }
       />
@@ -134,6 +139,11 @@ export default async function AgentePage({ searchParams }: { searchParams: Promi
                       <Link href={`/agente/${t.id}`} className="font-medium text-zinc-900 hover:underline">
                         {t.title}
                       </Link>
+                      {t.kind === "auditoria" || t.kind === "revisao" ? (
+                        <span className="ml-2 align-middle">
+                          <Badge tone="blue">{t.kind === "revisao" ? "revisão de QA" : "auditoria"}</Badge>
+                        </span>
+                      ) : null}
                     </Td>
                     <Td className="text-xs">{t.repoFullName}</Td>
                     <Td>
