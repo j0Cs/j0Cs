@@ -160,6 +160,21 @@ valor que só você viu. Os valores são gerados no painel, no seu navegador, e 
    - em Alertas, **Verificar agora** funciona;
    - no dia seguinte, a rotina diária rodou (câmbio atualizado em Câmbio e taxas).
 
+## Perdi a senha do painel (ou o login dá "E-mail ou senha incorretos")
+
+A conta do dono é a mesma no painel e no app. O "Recuperar senha" depende do e-mail (Microsoft 365, doc 5); enquanto
+ele não estiver configurado, a troca é feita pela Vercel, sem a senha passar por conversa:
+
+1. Vercel → `forja-admin` → Settings → Environment Variables:
+   - edite `ADMIN_PASSWORD` com a senha nova (14 caracteres ou mais);
+   - crie `ADMIN_PASSWORD_RESET` com um texto novo, por exemplo a data de hoje (`2026-11-09`). Production.
+2. Deployments → no último de produção, **Redeploy**.
+3. No log do build deve aparecer `✔ senha do dono trocada pelo ADMIN_PASSWORD`. Entre com a senha nova; o código do
+   app autenticador (2FA) continua o mesmo.
+
+A troca vale uma vez para cada valor de `ADMIN_PASSWORD_RESET` (os deploys seguintes não mexem na senha) e encerra as
+sessões abertas. Depois de entrar, pode apagar `ADMIN_PASSWORD_RESET`. Para trocar de novo no futuro, use outro valor.
+
 ## Plano de incidente: segredo vazado
 
 Meta: **segredo vazado trocado em até 15 minutos**. Primeiro corte o acesso (revogue no serviço de origem), depois

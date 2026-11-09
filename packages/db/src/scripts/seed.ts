@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { somenteEmProducao } from "./env";
 import { DEFAULT_MODELS, DEFAULT_PLANS, DEFAULT_PRICING_SETTINGS, PROVIDERS, type ProviderId } from "@forja/core";
 import { encryptSecret, secretHint } from "@forja/core/server";
@@ -13,6 +14,8 @@ import {
   plans,
   projects,
   providerKeys,
+  sessions,
+  settings,
   subscriptions,
   users,
 } from "../schema";
@@ -133,6 +136,47 @@ if (process.env.ADMIN_PASSWORD === SENHA_DE_EXEMPLO || process.env.ADMIN_EMAIL?.
     platformRole: "staff",
   });
   console.log(`✔ conta do painel do dono: ${staff.email}`);
+  await trocaDeEmergencia(staff.id);
+}
+
+/**
+ * Troca de emergência da senha do dono, sem e-mail e sem a senha passar por conversa:
+ *   1. na Vercel (forja-admin → Settings → Environment Variables), edite ADMIN_PASSWORD com a senha nova
+ *      (14 caracteres ou mais) e crie ADMIN_PASSWORD_RESET com um texto novo (ex.: a data de hoje);
+ *   2. publique o painel de novo (Redeploy).
+ * Vale para o painel e para o app (é a mesma conta). Aplica UMA vez por valor de ADMIN_PASSWORD_RESET,
+ * encerra as sessões abertas e mantém o 2FA. Depois, pode apagar ADMIN_PASSWORD_RESET.
+ */
+async function trocaDeEmergencia(userId: string) {
+  const pedido = process.env.ADMIN_PASSWORD_RESET?.trim();
+  if (!pedido) return;
+  const nova = process.env.ADMIN_PASSWORD ?? "";
+  if (nova.length < 14) {
+    console.warn("↷ troca de senha NÃO aplicada: ADMIN_PASSWORD precisa ter pelo menos 14 caracteres");
+    return;
+  }
+  const marca = createHash("sha256").update(`troca:${pedido}`).digest("hex");
+  const anterior = await db.query.settings.findFirst({ where: eq(settings.key, "admin_password_reset") });
+  if ((anterior?.value as { marca?: string } | undefined)?.marca === marca) {
+    console.log("↷ troca de senha já aplicada para este ADMIN_PASSWORD_RESET (use um valor novo para trocar de novo)");
+    return;
+  }
+  const r = await db
+    .update(accounts)
+    .set({ password: await hashPassword(nova), updatedAt: new Date() })
+    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")))
+    .returning({ id: accounts.id });
+  if (!r.length) {
+    console.warn("↷ troca de senha NÃO aplicada: a conta do dono não tem senha cadastrada");
+    return;
+  }
+  await db.delete(sessions).where(eq(sessions.userId, userId));
+  const valor = { marca, aplicadaEm: new Date().toISOString() };
+  await db
+    .insert(settings)
+    .values({ key: "admin_password_reset", value: valor })
+    .onConflictDoUpdate({ target: settings.key, set: { value: valor, updatedAt: new Date() } });
+  console.log("✔ senha do dono trocada pelo ADMIN_PASSWORD (pedido de troca aplicado); sessões encerradas, 2FA mantido");
 }
 
 // Conta demo (senha pública no README): SÓ com opt-in explícito, NUNCA em build da Vercel e só
