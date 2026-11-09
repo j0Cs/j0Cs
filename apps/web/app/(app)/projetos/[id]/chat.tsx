@@ -1,5 +1,6 @@
 "use client";
 
+import { BotaoCopiar, Markdown } from "@/components/markdown";
 import { formatBrlMicros, TIER_LABELS } from "@forja/core";
 import { Button, cx, inputBaseClass, inputClass } from "@forja/ui";
 import { ArrowUp, Square } from "lucide-react";
@@ -209,8 +210,27 @@ export function Chat(props: {
                   {props.models.find((x) => x.id === m.modelId)?.displayName ?? m.modelId}
                 </p>
               ) : null}
-              {m.content ? <RichText text={m.content} /> : <span className="animate-pulse text-zinc-400">pensando…</span>}
-              {m.meta ? <p className="mt-2 text-[11px] text-zinc-500">{m.meta}</p> : null}
+              {m.content ? (
+                m.role === "assistant" && !m.error ? (
+                  <Markdown texto={m.content} />
+                ) : (
+                  <span className="whitespace-pre-wrap">{m.content}</span>
+                )
+              ) : (
+                <span className="animate-pulse text-zinc-400">pensando…</span>
+              )}
+              {m.meta || (m.role === "assistant" && m.content && !m.error) ? (
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-zinc-500">{m.meta}</p>
+                  {m.role === "assistant" && m.content && !m.error ? (
+                    <BotaoCopiar
+                      texto={m.content}
+                      rotulo="Copiar resposta"
+                      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-zinc-500 hover:bg-zinc-200 hover:text-zinc-800"
+                    />
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         ))}
@@ -248,25 +268,5 @@ export function Chat(props: {
         )}
       </form>
     </section>
-  );
-}
-
-/** Renderização mínima: blocos ``` viram <pre>, o resto mantém quebras de linha. */
-function RichText({ text }: { text: string }) {
-  const parts = text.split(/```/);
-  return (
-    <>
-      {parts.map((part, i) =>
-        i % 2 === 1 ? (
-          <pre key={i} className="my-2 overflow-x-auto rounded-lg bg-zinc-950 p-3 text-xs text-zinc-100">
-            <code>{part.replace(/^[\w-]*\n/, "")}</code>
-          </pre>
-        ) : (
-          <span key={i} className="whitespace-pre-wrap">
-            {part}
-          </span>
-        ),
-      )}
-    </>
   );
 }

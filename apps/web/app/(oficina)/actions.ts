@@ -39,7 +39,7 @@ export async function prepararCall(projeto: string) {
   return ensureProject(projeto, "Ideia em call");
 }
 
-/** Fim da call: grava a especificação como instruções do projeto e abre o projeto. */
+/** Fim da call: grava a especificação como instruções do projeto e leva à primeira tarefa do agente. */
 export async function concluirCall(input: { projectId: string; spec: import("@/lib/call").CallSpec }) {
   const { db, org } = await getSession();
   const { specToInstructions } = await import("@/lib/call");
@@ -53,5 +53,6 @@ export async function concluirCall(input: { projectId: string; spec: import("@/l
       ...(instrucoes ? { instructions: instrucoes } : {}),
     })
     .where(and(eq(schema.projects.id, input.projectId), eq(schema.projects.orgId, org.id)));
-  redirect(`/projetos/${input.projectId}`);
+  // a especificação vira a primeira tarefa do agente (a pessoa escolhe o repositório e confirma)
+  redirect(instrucoes ? `/agente/nova?projeto=${input.projectId}` : `/projetos/${input.projectId}`);
 }

@@ -87,6 +87,7 @@ export function createGatewayStore(db: Db): GatewayStore {
             latencyMs: r.latencyMs,
             status: r.status,
             errorMessage: r.errorMessage ?? null,
+            agentTaskId: r.agentTaskId ?? null,
           })
           .returning({ id: usageEvents.id });
 

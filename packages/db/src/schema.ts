@@ -167,6 +167,8 @@ export const organizations = pgTable(
     creditBalanceBrlMicros: money("credit_balance_brl_micros"),
     /** Cliente no Stripe (cus_...). */
     billingCustomerId: text("billing_customer_id"),
+    /** Teto diário de gasto do agente (soma das tarefas no dia). */
+    agentDailyCapBrlMicros: bigint("agent_daily_cap_brl_micros", { mode: "number" }).notNull().default(100_000_000),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("organizations_billing_customer_unico").on(t.billingCustomerId).where(sql`${t.billingCustomerId} is not null`)],
@@ -365,11 +367,14 @@ export const usageEvents = pgTable(
     latencyMs: integer("latency_ms").notNull().default(0),
     status: usageStatusEnum("status").notNull(),
     errorMessage: text("error_message"),
+    /** Passo de uma tarefa do agente. */
+    agentTaskId: uuid("agent_task_id"),
     createdAt: createdAt(),
   },
   (t) => [
     index("usage_events_org_created_idx").on(t.orgId, t.createdAt),
     index("usage_events_created_idx").on(t.createdAt),
+    index("usage_events_agent_task_idx").on(t.agentTaskId),
   ],
 );
 
@@ -480,3 +485,99 @@ export const rateLimits = pgTable("rate_limits", {
   count: integer("count").notNull().default(0),
   windowStart: timestamp("window_start", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------------------------------------------------------------------------
+// Agente (Sprint 3): GitHub App e tarefas
+// ---------------------------------------------------------------------------
+
+/** Instalação do GitHub App "Forja Agentes" ligada a uma organização (sem token guardado). */
+export const githubInstallations = pgTable(
+  "github_installations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    installationId: bigint("installation_id", { mode: "number" }).notNull(),
+    accountLogin: text("account_login").notNull(),
+    accountType: text("account_type").notNull().default("User"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("github_installations_org_instalacao").on(t.orgId, t.installationId)],
+);
+
+/**
+ * Tarefa do agente: pedido em linguagem natural → plano → passos com ferramentas → diff → PR
+ * (só depois da aprovação). Status: executando | aguardando_aprovacao | abrindo_pr | concluida |
+ * parada | falhou | descartada.
+ */
+export const agentTasks = pgTable(
+  "agent_tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    request: text("request").notNull(),
+    installationId: bigint("installation_id", { mode: "number" }).notNull(),
+    repoFullName: text("repo_full_name").notNull(),
+    baseBranch: text("base_branch").notNull(),
+    /** Commit de partida (vazio = repositório sem commits). */
+    baseSha: text("base_sha"),
+    modelId: text("model_id").notNull(),
+    status: text("status").notNull().default("executando"),
+    /** Teto de gasto da tarefa (já limitado ao saldo livre na criação). */
+    budgetBrlMicros: money("budget_brl_micros"),
+    spentBrlMicros: money("spent_brl_micros"),
+    stepCount: integer("step_count").notNull().default(0),
+    /** Histórico do agente no formato neutro (AgentMessage[]). */
+    messages: jsonb("messages").notNull().$type<unknown[]>().default([]),
+    plan: text("plan"),
+    summary: text("summary"),
+    prTitle: text("pr_title"),
+    stopReason: text("stop_reason"),
+    error: text("error"),
+    branch: text("branch"),
+    prUrl: text("pr_url"),
+    prNumber: integer("pr_number"),
+    stopRequested: boolean("stop_requested").notNull().default(false),
+    /** Quem está executando e até quando (evita dois executores na mesma tarefa). */
+    runnerUntil: timestamp("runner_until", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [index("agent_tasks_org_created_idx").on(t.orgId, t.createdAt), index("agent_tasks_status_idx").on(t.status)],
+);
+
+/** Passos da tarefa, para a tela ao vivo. */
+export const agentTaskSteps = pgTable(
+  "agent_task_steps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    taskId: uuid("task_id").notNull().references(() => agentTasks.id, { onDelete: "cascade" }),
+    idx: integer("idx").notNull(),
+    /** pensamento | ferramenta | aviso */
+    kind: text("kind").notNull(),
+    toolName: text("tool_name"),
+    summary: text("summary").notNull().default(""),
+    detail: text("detail"),
+    isError: boolean("is_error").notNull().default(false),
+    chargeBrlMicros: money("charge_brl_micros"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("agent_task_steps_tarefa_idx").on(t.taskId, t.idx)],
+);
+
+/** Arquivos alterados pela tarefa (a cópia de trabalho; null = apagado). */
+export const agentTaskFiles = pgTable(
+  "agent_task_files",
+  {
+    taskId: uuid("task_id").notNull().references(() => agentTasks.id, { onDelete: "cascade" }),
+    path: text("path").notNull(),
+    content: text("content"),
+    updatedAt: updatedAt(),
+  },
+  (t) => [primaryKey({ columns: [t.taskId, t.path] })],
+);

@@ -11,6 +11,7 @@
     "test": "echo \"(web) sem testes unitários\""
   },
   "dependencies": {
+    "@forja/agent": "workspace:*",
     "@forja/auth": "workspace:*",
     "@forja/billing": "workspace:*",
     "@forja/core": "workspace:*",
@@ -22,7 +23,10 @@
     "next": "^16.4.5",
     "pg": "^8.23.1",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-markdown": "10.1.0",
+    "rehype-highlight": "7.0.2",
+    "remark-gfm": "4.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.4",

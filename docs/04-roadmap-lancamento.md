@@ -80,17 +80,21 @@ pagamento recusado (aviso → suspensão → reativação) e cancela pelo portal
 
 Objetivo: o cliente pede uma mudança em linguagem natural e recebe um pull request pronto para revisar.
 
+> **Adiantada em 09/11**: código pronto e testado com GitHub e modelo simulados (doc 9). Falta criar o GitHub App e
+> guardar as credenciais nos Secrets do Supabase (`docs/cowork/03-github-app-agentes.md`). Anexos no chat (imagem e
+> PDF) ficaram para a próxima rodada.
+
 - [ ] **[Você]** Criar o GitHub App "Forja Agentes" (o prompt do Cowork já reserva o nome); **[Claude]** configura
   as permissões mínimas: código e pull requests do repositório escolhido
-- [ ] **[Claude]** Instalação em 1 clique por organização, com escolha dos repositórios. Tokens de instalação de curta
+- [x] **[Claude]** Instalação em 1 clique por organização, com escolha dos repositórios. Tokens de instalação de curta
   duração: nenhum token pessoal guardado
-- [ ] **[Claude]** Ferramentas do agente: listar arquivos, ler arquivo, buscar no código, escrever numa branch, abrir PR
-- [ ] **[Claude]** Loop de ferramentas no gateway com medição por passo, **teto de gasto por tarefa** definido pelo
+- [x] **[Claude]** Ferramentas do agente: listar arquivos, ler arquivo, buscar no código, escrever numa branch, abrir PR
+- [x] **[Claude]** Loop de ferramentas no gateway com medição por passo, **teto de gasto por tarefa** definido pelo
   cliente (ex.: "até R$ 20") e botão de parar
-- [ ] **[Claude]** Tela da tarefa: plano → passos ao vivo → diff → link do PR; o cliente aprova antes de abrir o PR
-- [ ] **[Claude]** "Gerar projeto" da call vira a primeira tarefa do agente (a especificação viva entra como pedido)
-- [ ] **[Claude]** Chat: Markdown e código com destaque, anexos (imagem e PDF), botão copiar
-- [ ] **[Claude]** Proteções: tarefas simultâneas por organização, teto diário e saldo reservado durante a tarefa
+- [x] **[Claude]** Tela da tarefa: plano → passos ao vivo → diff → link do PR; o cliente aprova antes de abrir o PR
+- [x] **[Claude]** "Gerar projeto" da call vira a primeira tarefa do agente (a especificação viva entra como pedido)
+- [x] **[Claude]** Chat: Markdown e código com destaque, botão copiar (anexos de imagem e PDF: próxima rodada)
+- [x] **[Claude]** Proteções: tarefas simultâneas por organização, teto diário e saldo reservado durante a tarefa
 
 Pronto quando: num repositório de teste, "adicione uma página de contato com formulário" vira um PR que compila, com o
 custo da tarefa mostrado e abaixo do teto.

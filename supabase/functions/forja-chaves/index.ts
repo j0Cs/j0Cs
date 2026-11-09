@@ -14,6 +14,15 @@ const NOMES: Record<string, string[]> = {
   xai: ["GROK_API", "XAI_API_KEY"],
 };
 
+/** Outros segredos da Forja que podem ficar aqui (só estes nomes saem). */
+const OUTROS = [
+  "GITHUB_APP_ID",
+  "GITHUB_APP_SLUG",
+  "GITHUB_APP_CLIENT_ID",
+  "GITHUB_APP_CLIENT_SECRET",
+  "GITHUB_APP_PRIVATE_KEY",
+];
+
 /** Chaves que autorizam a chamada: a service_role (legada) e as chaves secretas novas (sb_secret_). */
 function chavesDoProjeto(): string[] {
   const lista: string[] = [];
@@ -53,7 +62,12 @@ Deno.serve(async (req) => {
     const nome = nomes.find((n) => (Deno.env.get(n) ?? "").trim());
     chaves[provedor] = nome ? { nome, valor: Deno.env.get(nome)!.trim() } : null;
   }
-  return new Response(JSON.stringify({ chaves }), {
+  const segredos: Record<string, string> = {};
+  for (const nome of OUTROS) {
+    const v = (Deno.env.get(nome) ?? "").trim();
+    if (v) segredos[nome] = v;
+  }
+  return new Response(JSON.stringify({ chaves, segredos }), {
     headers: { "content-type": "application/json", "cache-control": "no-store" },
   });
 });

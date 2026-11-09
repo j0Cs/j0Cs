@@ -43,6 +43,13 @@
       "when": 1793889191075,
       "tag": "0005_cobranca_stripe",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794225994447,
+      "tag": "0006_agente_github",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,27 @@
+{
+  "name": "@forja/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:integracao": "tsx --env-file-if-exists=../../.env test-integracao/agente.e2e.ts"
+  },
+  "dependencies": {
+    "@forja/core": "workspace:*",
+    "@forja/db": "workspace:*",
+    "diff": "9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "@types/pg": "^8.15.0",
+    "pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "^5.1.0"
+  }
+}

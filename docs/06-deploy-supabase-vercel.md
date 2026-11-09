@@ -65,6 +65,8 @@ As chaves de API da plataforma ficam em **Supabase → Edge Functions → Secret
 - Ordem de uso: chave própria do cliente (se houver), Secrets do Supabase, chaves cadastradas no painel.
 - O painel mostra quais nomes foram encontrados (Chaves de API), nunca o valor.
 - Para republicar a função depois de mudar o código: `supabase functions deploy forja-chaves --no-verify-jwt`.
+- A mesma função entrega as credenciais do GitHub App do agente (`GITHUB_APP_ID`, `GITHUB_APP_SLUG`,
+  `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, `GITHUB_APP_PRIVATE_KEY`; doc 9). Só esses nomes saem.
 
 ## Arquitetura
 

@@ -27,7 +27,7 @@ export interface ChaveDoSupabase {
   secret: string;
 }
 
-let cache: { ate: number; chaves: ChaveDoSupabase[] } | null = null;
+let cache: { ate: number; chaves: ChaveDoSupabase[]; segredos: Record<string, string> } | null = null;
 
 /** uuid estável a partir do nome do secret (o mesmo em todas as instâncias). */
 function idDoSecret(nome: string) {
@@ -41,14 +41,15 @@ function configuracao() {
   return base && chave ? { url: `${base.replace(/\/+$/, "")}/functions/v1/forja-chaves`, chave } : null;
 }
 
-async function lerSecrets(): Promise<ChaveDoSupabase[]> {
-  if (cache && Date.now() < cache.ate) return cache.chaves;
+async function lerTudo() {
+  if (cache && Date.now() < cache.ate) return cache;
   const cfg = configuracao();
   if (!cfg) {
-    cache = { ate: Date.now() + VALIDADE_MS, chaves: [] };
-    return [];
+    cache = { ate: Date.now() + VALIDADE_MS, chaves: [], segredos: {} };
+    return cache;
   }
   let chaves: ChaveDoSupabase[] = [];
+  let segredos: Record<string, string> = {};
   let validade = VALIDADE_MS;
   try {
     const r = await fetch(cfg.url, {
@@ -58,7 +59,11 @@ async function lerSecrets(): Promise<ChaveDoSupabase[]> {
       cache: "no-store",
     });
     if (!r.ok) throw new Error(`forja-chaves respondeu ${r.status}`);
-    const corpo = (await r.json()) as { chaves?: Partial<Record<ProviderId, { nome: string; valor: string } | null>> };
+    const corpo = (await r.json()) as {
+      chaves?: Partial<Record<ProviderId, { nome: string; valor: string } | null>>;
+      segredos?: Record<string, string>;
+    };
+    segredos = corpo.segredos && typeof corpo.segredos === "object" ? corpo.segredos : {};
     for (const providerId of Object.keys(NOMES_NOS_SECRETS) as ProviderId[]) {
       const c = corpo.chaves?.[providerId];
       if (c?.valor) chaves.push({ id: idDoSecret(c.nome), name: c.nome, providerId, secret: c.valor });
@@ -66,10 +71,23 @@ async function lerSecrets(): Promise<ChaveDoSupabase[]> {
   } catch (err) {
     console.error(JSON.stringify({ level: "error", msg: "não consegui ler as chaves dos Secrets do Supabase", err: String(err) }));
     chaves = cache?.chaves ?? []; // mantém as últimas chaves boas durante uma oscilação
+    segredos = cache?.segredos ?? {};
     validade = VALIDADE_APOS_ERRO_MS;
   }
-  cache = { ate: Date.now() + validade, chaves };
-  return chaves;
+  cache = { ate: Date.now() + validade, chaves, segredos };
+  return cache;
+}
+
+const lerSecrets = async () => (await lerTudo()).chaves;
+
+/**
+ * Outro segredo da Forja (ex.: credenciais do GitHub App): variável de ambiente primeiro, depois
+ * os Secrets do Supabase (só os nomes que a função forja-chaves libera).
+ */
+export async function segredo(nome: string): Promise<string | null> {
+  const doAmbiente = process.env[nome];
+  if (doAmbiente) return doAmbiente;
+  return (await lerTudo()).segredos[nome] ?? null;
 }
 
 /** Chave do provedor nos Secrets do Supabase (no máximo uma por provedor). */

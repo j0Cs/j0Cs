@@ -1,3 +1,42 @@
 @import "tailwindcss";
 @import "@forja/ui/styles.css";
 @source "../../../packages/ui/src";
+
+/* Destaque de código das respostas (highlight.js, tema escuro discreto) */
+.hljs-comment,
+.hljs-quote {
+  color: #8b949e;
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-type {
+  color: #ff7b72;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: #a5d6ff;
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attr {
+  color: #79c0ff;
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-name {
+  color: #d2a8ff;
+}
+.hljs-built_in,
+.hljs-meta,
+.hljs-attribute {
+  color: #ffa657;
+}
+.hljs-deletion {
+  color: #ffa198;
+}

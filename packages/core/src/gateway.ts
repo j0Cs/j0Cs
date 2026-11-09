@@ -1,7 +1,7 @@
 import { MENSAGENS_DE_BLOQUEIO, type BloqueioCode } from "./acesso";
 import { computeChargeBrlMicros, computeCostUsdMicros } from "./pricing";
 import { DEFAULT_ADAPTERS } from "./providers";
-import type { Effort, ProviderAdapter } from "./providers/types";
+import type { AgentMessage, AgentToolDef, Effort, ProviderAdapter } from "./providers/types";
 import type {
   CatalogModel,
   ChatMessage,
@@ -61,6 +61,8 @@ export interface UsageRecord {
   /** aborted = o cliente interrompeu (cobrado por estimativa); error = falha do provedor (não cobrado). */
   status: "ok" | "refused" | "error" | "aborted";
   errorMessage?: string;
+  /** Passo de uma tarefa do agente (medição por tarefa). */
+  agentTaskId?: string | null;
 }
 
 export interface GatewayStore {
@@ -325,4 +327,123 @@ export async function* runChat(deps: GatewayDeps, req: GatewayChatRequest): Asyn
       return;
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Agente: uma rodada com ferramentas, medida e cobrada como qualquer resposta
+// ---------------------------------------------------------------------------
+
+export interface AgentTurnRequest {
+  orgId: string;
+  userId?: string | null;
+  projectId?: string | null;
+  agentTaskId: string;
+  modelId: string;
+  system: string;
+  messages: AgentMessage[];
+  tools: AgentToolDef[];
+  effort?: Effort;
+  signal?: AbortSignal;
+}
+
+export type AgentTurnResult =
+  | {
+      ok: true;
+      message: Extract<AgentMessage, { role: "assistant" }>;
+      stopReason: string | null;
+      refused: boolean;
+      chargeBrlMicros: number;
+      balanceBrlMicros: number;
+    }
+  | { ok: false; code: GatewayErrorCode | "tools_unsupported"; message: string };
+
+/** Uma rodada do agente: autoriza (plano, saldo, chave), chama o modelo com ferramentas e cobra o uso. */
+export async function runAgentTurn(deps: GatewayDeps, req: AgentTurnRequest): Promise<AgentTurnResult> {
+  const now = deps.now ?? Date.now;
+  const adapters = { ...DEFAULT_ADAPTERS, ...deps.adapters };
+  const pedido = await deps.store.getModel(req.modelId);
+  if (pedido && !adapters[pedido.providerId].complete) {
+    return { ok: false, code: "tools_unsupported", message: "Este modelo ainda não executa tarefas de agente. Escolha um Claude, GPT ou Grok." };
+  }
+  let auth: Awaited<ReturnType<typeof authorize>>;
+  try {
+    auth = await authorize(deps.store, { orgId: req.orgId, modelId: req.modelId, messages: [] });
+  } catch (err) {
+    if (err instanceof GatewayError) return { ok: false, code: err.code, message: err.message };
+    throw err;
+  }
+  const { model, settings, keys } = auth;
+  const adapter = adapters[model.providerId];
+  if (!adapter.complete) {
+    return { ok: false, code: "tools_unsupported", message: "Este modelo ainda não executa tarefas de agente. Escolha um Claude, GPT ou Grok." };
+  }
+
+  const base = {
+    orgId: req.orgId,
+    userId: req.userId ?? null,
+    projectId: req.projectId ?? null,
+    conversationId: null,
+    agentTaskId: req.agentTaskId,
+    modelId: model.id,
+    providerId: model.providerId,
+  };
+
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i]!;
+    const startedAt = now();
+    const byok = key.byok === true;
+    const snapshot = { fxUsdBrl: settings.fxUsdBrl, costOverheadPercent: settings.costOverheadPercent, markupPercent: model.markupPercent, byok };
+    try {
+      const r = await adapter.complete({
+        model: model.id,
+        system: req.system,
+        messages: req.messages,
+        tools: req.tools,
+        apiKey: key.apiKey,
+        effort: req.effort,
+        signal: req.signal,
+      });
+      let costUsdMicros = 0;
+      const total: NormalizedUsage = { inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 };
+      for (const part of r.usageByModel) {
+        const pricedBy = part.model === model.id ? model : ((await deps.store.getModel(part.model)) ?? model);
+        costUsdMicros += computeCostUsdMicros(part.usage, pricedBy.pricing);
+        total.inputTokens += part.usage.inputTokens;
+        total.cacheReadTokens += part.usage.cacheReadTokens;
+        total.cacheWriteTokens += part.usage.cacheWriteTokens;
+        total.outputTokens += part.usage.outputTokens;
+      }
+      const chargeBrlMicros = byok ? 0 : computeChargeBrlMicros(costUsdMicros, settings, model.markupPercent);
+      const { balanceBrlMicros } = await deps.store.recordUsage({
+        ...base,
+        servedModelId: r.servedModel,
+        providerKeyId: key.id,
+        usage: total,
+        costUsdMicros: byok ? 0 : costUsdMicros,
+        chargeBrlMicros,
+        pricingSnapshot: snapshot,
+        latencyMs: now() - startedAt,
+        status: r.refused ? "refused" : "ok",
+      });
+      return { ok: true, message: r.message, stopReason: r.stopReason, refused: r.refused, chargeBrlMicros, balanceBrlMicros };
+    } catch (err) {
+      if (req.signal?.aborted) return { ok: false, code: "provider_error", message: "Tarefa interrompida." };
+      // sem resposta, nada a cobrar: tenta a próxima chave do pool
+      await deps.store.recordUsage({
+        ...base,
+        servedModelId: model.id,
+        providerKeyId: key.id,
+        usage: { inputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 },
+        costUsdMicros: 0,
+        chargeBrlMicros: 0,
+        pricingSnapshot: snapshot,
+        latencyMs: now() - startedAt,
+        status: "error",
+        errorMessage: (err instanceof Error ? err.message : String(err)).slice(0, 500),
+      });
+      if (i < keys.length - 1) continue;
+      return { ok: false, code: "provider_error", message: "O provedor falhou ao responder. Tente novamente." };
+    }
+  }
+  return { ok: false, code: "provider_unavailable", message: ERROR_MESSAGES.provider_unavailable };
 }
