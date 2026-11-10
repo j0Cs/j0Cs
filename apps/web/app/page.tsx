@@ -26,10 +26,10 @@ const ETAPAS = [
 ];
 
 const TIME = [
-  { cargo: "Dev Sênior", faz: "Explica o projeto, avalia a arquitetura e monta o plano de melhorias por impacto e esforço." },
-  { cargo: "Dev Pleno", faz: "Implementa no padrão do seu código, com testes, e aponta melhorias por onde passa." },
-  { cargo: "QA Pleno", faz: "Procura bugs e casos de borda, avalia os testes e revisa cada pull request." },
-  { cargo: "Cyber Security Pleno", faz: "Encontra vulnerabilidades exploráveis e entrega a correção, com atenção à LGPD." },
+  { nome: "Dédalo", oficio: "o arquiteto", cargo: "Dev Sênior", faz: "Explica o projeto, avalia a arquitetura e monta o plano de melhorias por impacto e esforço." },
+  { nome: "Brontes", oficio: "o forjador", cargo: "Dev Pleno", faz: "Implementa no padrão do seu código, com testes, e aponta melhorias por onde passa." },
+  { nome: "Argos", oficio: "o inspetor", cargo: "QA Pleno", faz: "Procura bugs e casos de borda, avalia os testes e revisa cada pull request." },
+  { nome: "Cérbero", oficio: "o guardião", cargo: "Cyber Security Pleno", faz: "Encontra vulnerabilidades exploráveis e entrega a correção, com atenção à LGPD." },
 ];
 
 const FAIXA = ["Claude", "ChatGPT", "Gemini", "Grok", "Claude Code", "Codex", "Gemini CLI", "Grok Build", "GitHub", "Vercel", "Supabase"];
@@ -243,17 +243,19 @@ export default async function Home() {
           <Revelar>
             <Sobre>Time de especialistas</Sobre>
             <Titulo>
-              Quatro papéis, <span className="text-brasa">um parecer cada</span>
+              Dédalo, Brontes, <span className="text-brasa">Argos e Cérbero</span>
             </Titulo>
             <p className="mt-5 max-w-2xl text-aco-300">
-              Na auditoria do projeto e na revisão de cada pull request, as IAs da Forja trabalham por papel. Cada achado diz quem encontrou, onde está e como corrigir.
+              Na auditoria do projeto e na revisão de cada pull request, quatro especialistas trabalham juntos, cada um no seu ofício. Cada achado diz quem encontrou, onde está e como corrigir.
             </p>
           </Revelar>
           <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {TIME.map((t, i) => (
-              <Revelar como="li" key={t.cargo} atraso={i * 100} className="cartao-vivo flex flex-col rounded-lg border border-aco-700 bg-aco-900 p-6">
-                <h3 className="font-display text-2xl font-extrabold uppercase leading-none tracking-[0.03em] text-aco-100">{t.cargo}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-aco-300">{t.faz}</p>
+              <Revelar como="li" key={t.nome} atraso={i * 100} className="cartao-vivo flex flex-col rounded-lg border border-aco-700 bg-aco-900 p-6">
+                <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-brasa-claro">{t.oficio}</p>
+                <h3 className="mt-2 font-display text-4xl font-extrabold uppercase leading-none tracking-[0.03em] text-aco-100">{t.nome}</h3>
+                <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-aco-300">{t.cargo}</p>
+                <p className="mt-4 text-sm leading-relaxed text-aco-300">{t.faz}</p>
                 <p className="mt-auto border-t border-aco-800 pt-4 font-mono text-[11px] leading-relaxed text-aco-300">
                   <span className="text-palha">exemplo de achado</span>
                   <br />

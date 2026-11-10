@@ -5,7 +5,7 @@ export const metadata = { title: "Baixar o app", description: "A Forja para macO
 
 const NO_COMPUTADOR = [
   ["Abrir uma pasta de projeto", "Estrutura e varredura de segurança sem GitHub. Os arquivos não saem da sua máquina."],
-  ["Instalar o time nos arquivos", "Dev Sênior, Dev Pleno, QA e Cyber Security viram subagentes e instruções do seu assistente."],
+  ["Instalar o time nos arquivos", "Dédalo, Brontes, Argos e Cérbero viram subagentes e instruções do seu assistente."],
   ["Telemetria com um clique", "Liga o envio de uso do Claude Code, do Codex e do Gemini CLI, mostrando antes o que muda."],
   ["Entrar pelo navegador", "O app usa a conta que já está aberta no seu navegador. Sem digitar a senha de novo."],
 ];

@@ -11,7 +11,7 @@ export default function TimePage() {
     <>
       <PageHeader
         title="Time de especialistas"
-        description="Os quatro papéis que as IAs da Forja seguem na auditoria e na revisão de pull requests. Instale o mesmo time no seu repositório para usar no Claude Code, no Codex, no Gemini CLI ou no Grok Build com a sua própria assinatura."
+        description="Dédalo, Brontes, Argos e Cérbero: os quatro especialistas que as IAs da Forja seguem na auditoria e na revisão de pull requests. Instale o mesmo time no seu repositório para usar no Claude Code, no Codex, no Gemini CLI ou no Grok Build com a sua própria assinatura."
         actions={
           <Link href="/projetos" className={buttonClass("brand", "sm")}>
             Instalar num repositório
@@ -24,7 +24,8 @@ export default function TimePage() {
           <Card key={p} className="p-5">
             <div className="mb-2 flex items-start justify-between gap-2">
               <div>
-                <p className="font-medium text-zinc-900">{PERSONAS[p].cargo}</p>
+                <p className="text-lg font-semibold text-zinc-900">{PERSONAS[p].apelido} <span className="text-sm font-normal text-zinc-500">· o {PERSONAS[p].oficio}</span></p>
+                <p className="text-sm text-zinc-700">{PERSONAS[p].cargo}</p>
                 <p className="text-xs text-zinc-500">{PERSONAS[p].modo === "revisa" ? "Analisa e recomenda (não altera arquivos)" : "Implementa mudanças"}</p>
               </div>
               <Badge tone="gray">{PERSONAS[p].nome}</Badge>

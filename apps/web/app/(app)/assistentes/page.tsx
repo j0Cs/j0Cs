@@ -151,7 +151,7 @@ export default async function AssistentesPage() {
           </li>
           <li className="rounded-lg bg-zinc-50 p-3">
             <b className="block text-zinc-900">2. Instale o time</b>
-            No repositório do projeto: Dev Sênior, Dev Pleno, QA Pleno e Cyber Security Pleno viram subagentes e instruções da sua ferramenta.
+            No repositório do projeto: Dédalo (Dev Sênior), Brontes (Dev Pleno), Argos (QA) e Cérbero (Cyber Security) viram subagentes e instruções da sua ferramenta.
           </li>
           <li className="rounded-lg bg-zinc-50 p-3">
             <b className="block text-zinc-900">3. Construa como sempre</b>

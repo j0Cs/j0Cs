@@ -12,7 +12,14 @@ export type Persona = "dev_senior" | "dev_pleno" | "qa_pleno" | "seguranca_pleno
 
 export interface DefinicaoDePersona {
   id: Persona;
-  /** Nome curto na interface. */
+  /**
+   * Nome próprio do especialista na interface (da mesma oficina do Hefesto). Só aparece para
+   * pessoas: prompts e arquivos exportados seguem usando o papel.
+   */
+  apelido: string;
+  /** Uma palavra sobre o que ele faz, ao lado do nome. */
+  oficio: string;
+  /** Papel, em poucas palavras. */
   nome: string;
   cargo: string;
   /** Nome dos arquivos exportados (forja-dev-senior…). */
@@ -48,6 +55,8 @@ export const CHECKLIST_DE_CODIGO = `- Legibilidade: nomes claros, funções curt
 export const PERSONAS: Record<Persona, DefinicaoDePersona> = {
   dev_senior: {
     id: "dev_senior",
+    apelido: "Dédalo",
+    oficio: "arquiteto",
     nome: "Dev Sênior",
     cargo: "Desenvolvedor Sênior",
     slug: "forja-dev-senior",
@@ -93,6 +102,8 @@ Explicar o projeto (o que é, como está organizado e como os dados fluem), aval
 
   dev_pleno: {
     id: "dev_pleno",
+    apelido: "Brontes",
+    oficio: "forjador",
     nome: "Dev Pleno",
     cargo: "Desenvolvedor Pleno",
     slug: "forja-dev-pleno",
@@ -130,6 +141,8 @@ Mudança de arquitetura, do modelo de dados ou de contrato público de API, troc
 
   qa_pleno: {
     id: "qa_pleno",
+    apelido: "Argos",
+    oficio: "inspetor",
     nome: "QA Pleno",
     cargo: "Analista de QA Pleno",
     slug: "forja-qa-pleno",
@@ -179,6 +192,8 @@ Regra de negócio em teste unitário; banco, filas e APIs em teste de integraç�
 
   seguranca_pleno: {
     id: "seguranca_pleno",
+    apelido: "Cérbero",
+    oficio: "guardião",
     nome: "Cyber Security Pleno",
     cargo: "Analista de Cyber Security Pleno",
     slug: "forja-seguranca-pleno",
@@ -231,6 +246,9 @@ Para cada vulnerabilidade: onde (arquivo:linha), como seria explorada (cenário 
 - Não altere arquivos: você aponta; a correção é com o Dev Pleno.`,
   },
 };
+
+/** "Dédalo · Dev Sênior": como o especialista aparece em listas e rótulos. */
+export const rotuloDaPersona = (p: Persona) => `${PERSONAS[p].apelido} · ${PERSONAS[p].nome}`;
 
 export const ORDEM_DAS_PERSONAS: Persona[] = ["dev_senior", "dev_pleno", "qa_pleno", "seguranca_pleno"];
 export const ehPersona = (v: unknown): v is Persona => typeof v === "string" && Object.hasOwn(PERSONAS, v);

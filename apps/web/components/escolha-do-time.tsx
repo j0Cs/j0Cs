@@ -10,7 +10,7 @@ export function EscolhaDoTime({ padrao, legenda = "Quem analisa" }: { padrao: Pe
           <label key={p} className="flex cursor-pointer items-start gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm has-[:checked]:border-zinc-900 has-[:checked]:bg-zinc-50">
             <input type="checkbox" name="persona" value={p} defaultChecked={padrao.includes(p)} className="mt-0.5" />
             <span>
-              <span className="block font-medium text-zinc-900">{PERSONAS[p].nome}</span>
+              <span className="block font-medium text-zinc-900">{PERSONAS[p].apelido} <span className="font-normal text-zinc-500">· {PERSONAS[p].nome}</span></span>
               <span className="block text-xs leading-snug text-zinc-500">{PERSONAS[p].resumo}</span>
             </span>
           </label>

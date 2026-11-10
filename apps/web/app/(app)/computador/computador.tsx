@@ -324,7 +324,7 @@ function Analise({ app, analise, reler, lendo, fechar }: { app: ForjaDesktop; an
           <p className="text-sm text-zinc-600">Nenhum segredo exposto nem arquivo de ambiente versionado.</p>
         )}
         <p className="mt-2 text-xs text-zinc-500">
-          A varredura roda neste computador e não usa créditos. A auditoria completa com o time (Dev Sênior, QA e Segurança) funciona com o repositório no GitHub, em Projetos →
+          A varredura roda neste computador e não usa créditos. A auditoria completa com o time (Dédalo, Argos e Cérbero) funciona com o repositório no GitHub, em Projetos →
           Repositório, ou com o seu assistente depois de instalar o time abaixo.
         </p>
       </div>

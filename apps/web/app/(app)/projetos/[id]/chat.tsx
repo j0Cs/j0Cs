@@ -12,10 +12,10 @@ import type { ModelOption } from "@/lib/models";
 /** Especialistas do time Forja (as instruções ficam no servidor). */
 const PAPEIS = [
   { id: "", label: "Assistente" },
-  { id: "dev_senior", label: "Dev Sênior" },
-  { id: "dev_pleno", label: "Dev Pleno" },
-  { id: "qa_pleno", label: "QA Pleno" },
-  { id: "seguranca_pleno", label: "Cyber Security" },
+  { id: "dev_senior", label: "Dédalo · Dev Sênior" },
+  { id: "dev_pleno", label: "Brontes · Dev Pleno" },
+  { id: "qa_pleno", label: "Argos · QA Pleno" },
+  { id: "seguranca_pleno", label: "Cérbero · Cyber Security" },
 ];
 
 interface Msg {

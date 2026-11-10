@@ -31,7 +31,7 @@ export interface Relatorio {
   comentario?: { url: string; em: string } | null;
 }
 
-const PERSONA: Record<Persona, string> = { dev_senior: "Dev Sênior", dev_pleno: "Dev Pleno", qa_pleno: "QA Pleno", seguranca_pleno: "Cyber Security Pleno" };
+const PERSONA: Record<Persona, string> = { dev_senior: "Dédalo · Dev Sênior", dev_pleno: "Brontes · Dev Pleno", qa_pleno: "Argos · QA Pleno", seguranca_pleno: "Cérbero · Cyber Security" };
 const VEREDITO: Record<Veredito, { label: string; tone: "green" | "amber" | "red" }> = {
   pode_seguir: { label: "Pode seguir", tone: "green" },
   seguir_com_ajustes: { label: "Seguir com ajustes", tone: "amber" },
@@ -111,7 +111,7 @@ export function RelatorioDaAuditoria(props: { taskId: string; tipo: "auditoria" 
           <div className="grid gap-3 md:grid-cols-2">
             {props.relatorio.pareceres.map((p) => (
               <div key={p.persona} className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Parecer do {PERSONA[p.persona]}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Parecer de {PERSONA[p.persona]}</p>
                 <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-800">{p.parecer}</p>
               </div>
             ))}
