@@ -65,7 +65,7 @@ jobs:
       matrix:
         include:
           - nome: macOS
-            maquina: macos-14
+            maquina: macos-latest
             alvo: --mac --arm64 --x64
             executavel: release/mac-arm64/Forja.app/Contents/MacOS/Forja
           - nome: Windows
