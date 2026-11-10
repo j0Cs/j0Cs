@@ -9,6 +9,8 @@ import { NextResponse, type NextRequest } from "next/server";
 // assinatura do evento (STRIPE_WEBHOOK_SECRET), não por sessão. /api/otlp recebe a telemetria dos
 // assistentes de IA, autenticada pelo token de envio de cada fonte. /precos é a página pública de preços.
 const PUBLIC = [
+  "/", // site (quem já entrou é levado à central pela própria página)
+  "/icon.svg",
   "/entrar",
   "/cadastro",
   "/recuperar-senha",
