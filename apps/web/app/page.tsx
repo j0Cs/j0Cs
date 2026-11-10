@@ -271,14 +271,17 @@ export default async function Home() {
             {APP_NAME} · oficina de software
           </span>
           <span className="flex gap-6">
+            <Link href="/status" className={linkAcessoClass()}>
+              Status
+            </Link>
+            <Link href="/suporte" className={linkAcessoClass()}>
+              Suporte
+            </Link>
             <Link href="/precos" className={linkAcessoClass()}>
               Preços
             </Link>
             <Link href="/entrar" className={linkAcessoClass()}>
               Entrar
-            </Link>
-            <Link href="/cadastro" className={linkAcessoClass()}>
-              Criar conta
             </Link>
           </span>
         </div>

@@ -133,6 +133,11 @@ export async function criarCheckoutAssinatura(
 
   const cliente = await garantirCliente(db, stripe, input.org, input.email);
   const preco = await garantirPreco(stripe, plano);
+  // convite de fundador: o cupom entra sozinho (o Stripe não aceita cupom fixo e campo de código juntos)
+  const convite = input.org.betaInviteId
+    ? await db.query.betaInvites.findFirst({ where: eq(schema.betaInvites.id, input.org.betaInviteId) })
+    : null;
+  const cupom = convite && !convite.revokedAt ? convite.stripeCouponId : null;
   const sessao = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: cliente,
@@ -141,7 +146,7 @@ export async function criarCheckoutAssinatura(
     line_items: [{ price: preco, quantity: quantidade }],
     allowed_payment_method_types: ["card", "boleto"],
     payment_method_options: { boleto: { expires_after_days: BOLETO_DIAS } },
-    allow_promotion_codes: true,
+    ...(cupom ? { discounts: [{ coupon: cupom }] } : { allow_promotion_codes: true }),
     billing_address_collection: "required",
     tax_id_collection: { enabled: true },
     customer_update: { name: "auto", address: "auto" },
@@ -152,6 +157,23 @@ export async function criarCheckoutAssinatura(
   });
   if (!sessao.url) throw new Error("O Stripe não devolveu o endereço do checkout.");
   return sessao.url;
+}
+
+/**
+ * Cria no Stripe o cupom de uma oferta de fundador: desconto fixo em reais por alguns meses
+ * (ex.: R$ 150 de desconto por 6 meses faz o Pro de R$ 447 sair por R$ 297).
+ */
+export async function criarCupomDeFundador(input: { nome: string; descontoCentavos: number; meses: number }) {
+  if (!Number.isInteger(input.descontoCentavos) || input.descontoCentavos < 100) throw new RegraDeCobranca("Informe o desconto em reais (pelo menos R$ 1).");
+  if (!Number.isInteger(input.meses) || input.meses < 1 || input.meses > 24) throw new RegraDeCobranca("Informe por quantos meses vale o desconto (1 a 24).");
+  const cupom = await getStripe().coupons.create({
+    name: input.nome.slice(0, 40),
+    amount_off: input.descontoCentavos,
+    currency: "brl",
+    duration: "repeating",
+    duration_in_months: input.meses,
+  });
+  return cupom.id;
 }
 
 /** Checkout de recarga avulsa (Pix ou cartão). Só para quem já assina. */

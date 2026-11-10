@@ -1,4 +1,5 @@
-import { getDb, getInvitation } from "@forja/db";
+import { formatBrlCents } from "@forja/core";
+import { getBetaInvite, getDb, getInvitation } from "@forja/db";
 import { AvisoAcesso, CampoAcesso, inputAcessoClass, linkAcessoClass } from "@forja/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -9,10 +10,11 @@ import { signUpAction } from "../actions";
 
 export const metadata = { title: "Criar conta" };
 
-export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ convite?: string }> }) {
-  const { convite } = await searchParams;
+export default async function SignUpPage({ searchParams }: { searchParams: Promise<{ convite?: string; fundador?: string }> }) {
+  const { convite, fundador } = await searchParams;
   if (await getAuthUser()) redirect(convite ? `/convite/${convite}` : "/central");
   const invite = convite ? await getInvitation(getDb(), convite) : null;
+  const beta = fundador && !convite ? await getBetaInvite(getDb(), fundador) : null;
 
   return (
     <>
@@ -29,6 +31,19 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
       >
         Criar conta
       </TituloDeAcesso>
+      {beta ? (
+        <div className="mb-5">
+          <AvisoAcesso tom="info">
+            <b className="font-medium">Convite de fundador para {beta.label}.</b> {beta.trialDays} dias de teste com{" "}
+            {formatBrlCents(beta.creditsBrlCents)} em créditos, sem cartão.
+            {beta.offer ? <> Na assinatura: {beta.offer}.</> : null}
+          </AvisoAcesso>
+        </div>
+      ) : fundador && !convite ? (
+        <div className="mb-5">
+          <AvisoAcesso tom="atencao">Este convite de fundador não vale mais. Você ainda pode criar a conta com o teste grátis normal.</AvisoAcesso>
+        </div>
+      ) : null}
       {convite && !invite ? (
         <div className="mb-5">
           <AvisoAcesso tom="atencao">Convite inválido ou expirado. Você ainda pode criar uma conta própria.</AvisoAcesso>
@@ -36,6 +51,7 @@ export default async function SignUpPage({ searchParams }: { searchParams: Promi
       ) : null}
       <ActionForm action={signUpAction} submit="Criar conta" pending="Criando…" tema="acesso" className="space-y-5">
         {invite ? <input type="hidden" name="invite" value={convite} /> : null}
+        {beta ? <input type="hidden" name="fundador" value={beta.code} /> : null}
         <CampoAcesso label="Seu nome">
           <input name="name" autoComplete="name" required className={inputAcessoClass} />
         </CampoAcesso>

@@ -17,6 +17,8 @@ const PUBLIC = [
   "/redefinir-senha",
   "/convite",
   "/precos",
+  "/status",
+  "/suporte",
   "/api/auth",
   "/api/cron",
   "/api/stripe/webhook",

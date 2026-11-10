@@ -6,6 +6,7 @@ export {
   assinaturaVigente,
   criarCheckoutAssinatura,
   criarCheckoutRecarga,
+  criarCupomDeFundador,
   criarSessaoDoPortal,
   garantirPreco,
   resumoDaCobranca,

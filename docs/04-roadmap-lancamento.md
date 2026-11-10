@@ -1,6 +1,6 @@
 # 4. Roadmap até o lançamento (janeiro/2027)
 
-Atualizado em **09/11/2026**. Meta: **beta fechado em 04/01/2027** e **lançamento público por volta de 20/01/2027**.
+Atualizado em **10/11/2026**. Meta: **beta fechado em 04/01/2027** e **lançamento público por volta de 20/01/2027**.
 São cerca de 7 semanas úteis de construção antes do recesso. Sprints de 1 a 2 semanas, cada uma terminando com algo
 que funciona em produção (staging).
 
@@ -189,12 +189,15 @@ Congelamento: só correção de bugs. Bom momento para gravar vídeos de demonst
 
 Objetivo: 10 a 20 empresas usando de verdade, pagando preço de fundador, e dados para ajustar preço e produto.
 
+> **Adiantada em 10/11**: as ferramentas do beta estão prontas (doc 12). Falta a parte que depende de gente e de dados.
+
 - [ ] **[Você]** Lista de convidados (software houses e agências conhecidas) e oferta de fundador (ex.: Pro por
-  R$ 297 por 6 meses em troca de feedback e depoimento); **[Claude]** cria o cupom no Stripe e o convite por link
-- [ ] **[Claude]** Onboarding guiado: primeiro projeto, primeiro conector e primeira resposta em menos de 10 minutos
-- [ ] **[Claude]** Métricas no painel: créditos usados, modelos mais usados, acerto do cache, margem real por cliente,
-  funil cadastro → confirmação → primeira resposta → assinatura
-- [ ] **[Claude]** Landing page, página de status e canal de suporte (e-mail e WhatsApp)
+  R$ 297 por 6 meses em troca de feedback e depoimento)
+- [x] **[Claude]** Convite de fundador por link, com teste maior, créditos e cupom do Stripe aplicado na assinatura
+- [x] **[Claude]** Onboarding guiado: confirmar e-mail, primeiro projeto, primeiro pedido e GitHub
+- [x] **[Claude]** Métricas no painel: empresas ativas, funil, modelos mais usados, acerto do cache e margem por cliente
+- [x] **[Claude]** Site, página de status e canal de suporte (e-mail e WhatsApp)
+- [ ] **[Você]** `SUPORTE_EMAIL`, `SUPORTE_WHATSAPP` e `WEB_URL` (painel) na Vercel
 - [ ] **[Você + Claude]** Ajustar preços e margens com os dados reais (o painel muda sem deploy)
 
 Pronto quando: pelo menos 10 empresas ativas na semana, nenhuma com margem negativa, e a lista de ajustes do

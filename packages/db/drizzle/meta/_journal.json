@@ -64,6 +64,13 @@
       "when": 1794261350726,
       "tag": "0008_assistentes_auditoria",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794328200236,
+      "tag": "0009_beta_fechado",
+      "breakpoints": true
     }
   ]
 }

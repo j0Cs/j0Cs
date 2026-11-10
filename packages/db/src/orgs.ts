@@ -2,7 +2,7 @@ import { DEFAULT_PLANS, TRIAL_DAYS, TRIAL_PLAN_ID } from "@forja/core";
 import { randomBytes } from "node:crypto";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import type { Db } from "./client";
-import { invitations, memberships, organizations, plans, subscriptions, users } from "./schema";
+import { betaInvites, invitations, memberships, organizations, plans, subscriptions, users } from "./schema";
 import { addCredits } from "./store";
 
 export type MemberRole = "owner" | "admin" | "member";
@@ -18,23 +18,53 @@ function slugify(name: string) {
   return base || "empresa";
 }
 
+const CODIGO_DE_CONVITE = /^[A-Z0-9]{6,20}$/;
+export const normalizarCodigoDeConvite = (v: unknown) => String(v ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+
+/** Convite de fundador ainda válido (não revogado, não vencido e com usos sobrando), ou null. */
+export async function getBetaInvite(db: Db, codigo: unknown) {
+  const code = normalizarCodigoDeConvite(codigo);
+  if (!CODIGO_DE_CONVITE.test(code)) return null;
+  const c = await db.query.betaInvites.findFirst({ where: eq(betaInvites.code, code) });
+  if (!c || c.revokedAt || (c.expiresAt && c.expiresAt < new Date()) || c.uses >= c.maxUses) return null;
+  return c;
+}
+
 /**
  * Cria a organização de um novo cliente já no teste grátis:
- * plano "trial", assinatura de 7 dias e R$ 10 em créditos.
+ * plano "trial", assinatura de 7 dias e R$ 10 em créditos. Com um convite de fundador válido, os
+ * dias e os créditos são os do convite (um uso é consumido na mesma transação).
  */
-export async function createOrganizationForUser(db: Db, input: { userId: string; name: string }) {
+export async function createOrganizationForUser(db: Db, input: { userId: string; name: string; convite?: string | null }) {
   const trial = DEFAULT_PLANS.find((p) => p.id === TRIAL_PLAN_ID)!;
   let slug = slugify(input.name);
   if (await db.query.organizations.findFirst({ where: eq(organizations.slug, slug) })) {
     slug = `${slug}-${randomBytes(3).toString("hex")}`;
   }
+  const codigo = normalizarCodigoDeConvite(input.convite);
 
-  const org = await db.transaction(async (tx) => {
+  const { org, convite } = await db.transaction(async (tx) => {
     const now = new Date();
-    const fimDoTeste = new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+    // consome um uso do convite de forma atômica: dois cadastros ao mesmo tempo não passam do limite
+    const [convite] = CODIGO_DE_CONVITE.test(codigo)
+      ? await tx
+          .update(betaInvites)
+          .set({ uses: sql`${betaInvites.uses} + 1` })
+          .where(
+            and(
+              eq(betaInvites.code, codigo),
+              isNull(betaInvites.revokedAt),
+              sql`${betaInvites.uses} < ${betaInvites.maxUses}`,
+              sql`(${betaInvites.expiresAt} is null or ${betaInvites.expiresAt} > now())`,
+            ),
+          )
+          .returning()
+      : [];
+    const dias = convite ? Math.min(Math.max(convite.trialDays, 1), 90) : TRIAL_DAYS;
+    const fimDoTeste = new Date(now.getTime() + dias * 24 * 60 * 60 * 1000);
     const [created] = await tx
       .insert(organizations)
-      .values({ name: input.name.trim(), slug, planId: TRIAL_PLAN_ID, trialEndsAt: fimDoTeste, planCreditsSince: now })
+      .values({ name: input.name.trim(), slug, planId: TRIAL_PLAN_ID, trialEndsAt: fimDoTeste, planCreditsSince: now, betaInviteId: convite?.id ?? null })
       .returning();
     await tx.insert(memberships).values({ orgId: created!.id, userId: input.userId, role: "owner" });
     await tx.insert(subscriptions).values({
@@ -44,14 +74,14 @@ export async function createOrganizationForUser(db: Db, input: { userId: string;
       currentPeriodStart: now,
       currentPeriodEnd: fimDoTeste,
     });
-    return created!;
+    return { org: created!, convite: convite ?? null };
   });
 
   await addCredits(db, {
     orgId: org.id,
-    amountBrlMicros: trial.includedCreditsBrlCents * 10_000,
+    amountBrlMicros: (convite ? convite.creditsBrlCents : trial.includedCreditsBrlCents) * 10_000,
     kind: "plan_grant",
-    description: "Créditos do teste grátis",
+    description: convite ? "Créditos do convite de fundador" : "Créditos do teste grátis",
   });
   return org;
 }

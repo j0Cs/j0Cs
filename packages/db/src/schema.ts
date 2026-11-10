@@ -167,12 +167,36 @@ export const organizations = pgTable(
     creditBalanceBrlMicros: money("credit_balance_brl_micros"),
     /** Cliente no Stripe (cus_...). */
     billingCustomerId: text("billing_customer_id"),
+    /** Convite de fundador usado no cadastro (beta): define o cupom aplicado na assinatura. */
+    betaInviteId: uuid("beta_invite_id"),
     /** Teto diário de gasto do agente (soma das tarefas no dia). */
     agentDailyCapBrlMicros: bigint("agent_daily_cap_brl_micros", { mode: "number" }).notNull().default(100_000_000),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("organizations_billing_customer_unico").on(t.billingCustomerId).where(sql`${t.billingCustomerId} is not null`)],
 );
+
+/**
+ * Convites de fundador do beta fechado: um link com código dá dias extras de teste, créditos extras
+ * e, na assinatura, um cupom do Stripe (ex.: Pro com desconto por 6 meses).
+ */
+export const betaInvites = pgTable("beta_invites", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: text("code").notNull().unique(),
+  /** Para quem é (empresa ou pessoa convidada). */
+  label: text("label").notNull(),
+  trialDays: integer("trial_days").notNull(),
+  creditsBrlCents: integer("credits_brl_cents").notNull(),
+  /** Cupom do Stripe aplicado no checkout da assinatura (opcional). */
+  stripeCouponId: text("stripe_coupon_id"),
+  /** Texto da oferta mostrado a quem recebe o convite (ex.: "Pro por R$ 297 nos 6 primeiros meses"). */
+  offer: text("offer"),
+  maxUses: integer("max_uses").notNull().default(1),
+  uses: integer("uses").notNull().default(0),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: createdAt(),
+});
 
 export const memberships = pgTable(
   "memberships",

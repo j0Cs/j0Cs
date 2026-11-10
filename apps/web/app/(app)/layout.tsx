@@ -37,6 +37,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <span className="text-base font-semibold text-white tabular-nums">{formatBrlMicros(org.creditBalanceBrlMicros)}</span>
             <span className="block">Plano {plan?.name ?? "—"}</span>
           </Link>
+          <Link href="/suporte" className="block hover:text-zinc-200">
+            Ajuda e suporte
+          </Link>
           <div className="flex items-center justify-between gap-2 border-t border-zinc-800 pt-3">
             <span className="min-w-0 truncate" title={user.email}>
               {user.name}

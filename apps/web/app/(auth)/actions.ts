@@ -99,7 +99,7 @@ export async function signUpAction(_: FormState, f: FormData): Promise<FormState
   try {
     const orgId = invite
       ? await acceptInvitation(db, { token: invite, userId, email })
-      : (await createOrganizationForUser(db, { userId, name: company })).id;
+      : (await createOrganizationForUser(db, { userId, name: company, convite: str(f, "fundador") })).id;
     await setActiveOrg(orgId);
   } catch (err) {
     if (err instanceof OrgError) return { error: err.message };
@@ -174,7 +174,7 @@ export async function createOrgAction(_: FormState, f: FormData): Promise<FormSt
   if (!user) redirect("/entrar");
   const name = str(f, "company").slice(0, LIMITE_NOME);
   if (!name) return { error: "Informe o nome da empresa." };
-  const org = await createOrganizationForUser(getDb(), { userId: user.id, name });
+  const org = await createOrganizationForUser(getDb(), { userId: user.id, name, convite: str(f, "fundador") });
   await setActiveOrg(org.id);
   redirect("/central");
 }

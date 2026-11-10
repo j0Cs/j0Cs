@@ -305,6 +305,50 @@ const painel = await b.resumoDoPainel(db);
 ok(painel.assinantes === 1 && painel.mrrCentavos === 5 * 397_00, "painel: 1 assinatura ativa, MRR da Equipe");
 ok(painel.porMes[0]!.recargas === 300_00 && painel.porMes[0]!.reembolsos === 150_00, "painel: recargas e reembolsos do mês");
 
+// ---------------------------------------------------------------- 15. convite de fundador (beta fechado)
+const cupomId = await b.criarCupomDeFundador({ nome: "Fundador · Agência", descontoCentavos: 150_00, meses: 6 });
+ok(cupomId.startsWith("cupom"), "cupom de fundador criado no Stripe");
+const semErro = async (fn: () => Promise<unknown>) => fn().then(() => "sem erro", (e: Error) => e.message);
+ok(/pelo menos R\$ 1/.test(await semErro(() => b.criarCupomDeFundador({ nome: "x", descontoCentavos: 0, meses: 6 }))), "cupom sem desconto é recusado");
+await db.insert(schema.betaInvites).values([
+  { code: "FUNDADOR01", label: "Agência", trialDays: 30, creditsBrlCents: 50_00, stripeCouponId: cupomId, offer: "Pro por R$ 297 nos 6 primeiros meses", maxUses: 1 },
+  { code: "VENCIDO001", label: "Antigo", trialDays: 30, creditsBrlCents: 50_00, maxUses: 5, expiresAt: new Date(Date.now() - 86_400_000) },
+]);
+ok((await db_.getBetaInvite(db, " fundador-01 "))?.label === "Agência" && (await db_.getBetaInvite(db, "VENCIDO001")) === null && (await db_.getBetaInvite(db, "NAOEXISTE1")) === null, "convite válido é achado (mesmo com espaços e hífen); vencido e inexistente não");
+const [uFu, uFa] = await db.insert(schema.users).values([{ name: "Fu", email: "fu@teste.local", emailVerified: true }, { name: "Fa", email: "fa@teste.local", emailVerified: true }]).returning();
+const [oA, oB] = await Promise.all([
+  createOrganizationForUser(db, { userId: uFu!.id, name: "Fundadora A", convite: "FUNDADOR01" }),
+  createOrganizationForUser(db, { userId: uFa!.id, name: "Fundadora B", convite: "FUNDADOR01" }),
+]);
+const comConvite = [oA, oB].filter((o) => o.betaInviteId);
+const semConvite = [oA, oB].find((o) => !o.betaInviteId)!;
+ok(comConvite.length === 1, "convite de 1 uso: dois cadastros ao mesmo tempo, só um leva");
+const fund = comConvite[0]!;
+const dias = (o: typeof fund) => Math.round((o.trialEndsAt!.getTime() - o.createdAt.getTime()) / 86_400_000);
+const saldoDe = async (id: string) => (await db.query.organizations.findFirst({ where: eq(schema.organizations.id, id) }))!.creditBalanceBrlMicros;
+ok(dias(fund) === 30 && (await saldoDe(fund.id)) === 50_000_000, "fundador: 30 dias de teste e R$ 50 em créditos");
+ok(dias(semConvite) === 7 && (await saldoDe(semConvite.id)) === 10_000_000, "quem ficou sem o convite recebe o teste normal (7 dias, R$ 10)");
+const oV = await createOrganizationForUser(db, { userId: uFu!.id, name: "Com vencido", convite: "VENCIDO001" });
+ok(oV.betaInviteId === null && dias(oV) === 7, "convite vencido não dá benefício");
+await b.criarCheckoutAssinatura(db, { org: fund, email: "fu@teste.local", planId: "pro", baseUrl: "x" });
+const sFund = JSON.stringify([...sim.estado.sessoes.values()].at(-1));
+ok(sFund.includes(cupomId) && !sFund.includes("allow_promotion_codes"), "checkout do fundador já sai com o cupom (sem campo de código)");
+await b.criarCheckoutAssinatura(db, { org: semConvite, email: "fa@teste.local", planId: "pro", baseUrl: "x" });
+const sNormal = JSON.stringify([...sim.estado.sessoes.values()].at(-1));
+ok(!sNormal.includes(cupomId) && sNormal.includes("allow_promotion_codes"), "checkout normal não leva o cupom e aceita código promocional");
+
+// métricas do beta
+const { metricasDoBeta } = await import("../../ops/src/metricas");
+await db.insert(schema.usageEvents).values([
+  { orgId: fund.id, modelId: "claude-sonnet-5-5", servedModelId: "claude-sonnet-5-5", providerId: "anthropic", inputTokens: 1000, cacheReadTokens: 3000, outputTokens: 500, costUsdMicros: 20_000, chargeBrlMicros: 200_000, pricingSnapshot: {}, status: "ok" },
+  { orgId: fund.id, modelId: "claude-sonnet-5-5", servedModelId: "claude-sonnet-5-5", providerId: "anthropic", costUsdMicros: 0, chargeBrlMicros: 0, pricingSnapshot: {}, status: "error" },
+]);
+const mb = await metricasDoBeta(db, 30);
+const cFund = mb.clientes.find((c) => c.orgId === fund.id);
+ok(mb.funil.cadastros >= 5 && mb.funil.primeiraResposta >= 1 && mb.funil.respostaEm10Min >= 1 && mb.funil.assinantes >= 1, "funil: cadastros, primeira resposta (em 10 min) e assinantes contados");
+ok(cFund?.requisicoes === 1 && cFund.chargeBrlMicros === 200_000 && cFund.convite === "Agência", "uso por cliente: só respostas certas contam, com a marca de fundador");
+ok(mb.cache.lido >= 3000 && mb.modelos.some((x) => x.modelId === "claude-sonnet-5-5"), "cache e modelos mais usados");
+
 logOriginal(`\n${falhas ? `✘ ${falhas} falha(s)` : "✔ tudo certo"} · e-mails gerados: ${emails.length}`);
 await closeDb();
 await sim.fechar();

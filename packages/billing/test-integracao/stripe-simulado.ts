@@ -168,6 +168,9 @@ export async function iniciarStripeSimulado(porta = 12111): Promise<Simulado> {
       estado.sessoes.set(s.id, s);
       return { body: s };
     }
+    if (metodo === "POST" && caminho === "/v1/coupons") {
+      return { body: { id: novoId("cupom"), object: "coupon", ...corpo } };
+    }
     if (metodo === "POST" && caminho === "/v1/billing_portal/sessions") {
       return { body: { id: novoId("bps"), object: "billing_portal.session", url: "https://portal.simulado/", ...corpo } };
     }

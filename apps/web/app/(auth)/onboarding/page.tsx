@@ -9,8 +9,8 @@ import { createOrgAction } from "../actions";
 
 export const metadata = { title: "Sua empresa" };
 
-export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ nova?: string }> }) {
-  const { nova } = await searchParams;
+export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ nova?: string; fundador?: string }> }) {
+  const { nova, fundador } = await searchParams;
   const user = await getAuthUser();
   if (!user) redirect("/entrar");
   const orgs = await listUserOrganizations(getDb(), user.id);
@@ -28,6 +28,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         {orgs.length ? "Nova organização" : `Olá, ${user.name.split(" ")[0]}`}
       </TituloDeAcesso>
       <ActionForm action={createOrgAction} submit="Continuar" pending="Criando…" tema="acesso" className="space-y-5">
+        {fundador && !orgs.length ? <input type="hidden" name="fundador" value={fundador.slice(0, 20)} /> : null}
         <CampoAcesso label="Empresa" hint="Se você é autônomo, use seu nome.">
           <input name="company" autoComplete="organization" required className={inputAcessoClass} />
         </CampoAcesso>

@@ -4,13 +4,14 @@ import { Badge, Button, Card, CardHeader, EmptyState, Field, inputClass, PageHea
 import { FolderGit2, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { listModelOptions } from "@/lib/models";
+import { PrimeirosPassos } from "@/components/primeiros-passos";
 import { getSession } from "@/lib/session";
 import { createProject } from "./actions";
 
 export const metadata = { title: "Projetos" };
 
 export default async function ProjectsPage() {
-  const { db, org, plan } = await getSession();
+  const { db, org, plan, user } = await getSession();
 
   const stats = db
     .select({
@@ -48,6 +49,7 @@ export default async function ProjectsPage() {
         title="Projetos"
         description="Cada projeto guarda conversas, instruções fixas, repositório e o custo acumulado."
       />
+      <PrimeirosPassos db={db} org={org} emailConfirmado={user.emailVerified} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-2">
@@ -88,7 +90,7 @@ export default async function ProjectsPage() {
             title="Novo projeto"
             description={plan?.maxProjects != null ? `Seu plano permite ${plan.maxProjects} projetos ativos.` : "Projetos ilimitados no seu plano."}
           />
-          <form action={createProject} className="space-y-4 p-5">
+          <form id="novo-projeto" action={createProject} className="scroll-mt-6 space-y-4 p-5">
             <Field label="Nome">
               <input name="name" required className={inputClass} placeholder="Ex.: ERP da loja" />
             </Field>
