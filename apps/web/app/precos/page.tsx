@@ -1,7 +1,7 @@
 import { PACOTES_DE_RECARGA_CENTAVOS } from "@forja/billing";
 import { formatBrlCents, TIER_LABELS, TRIAL_DAYS, TRIAL_PLAN_ID } from "@forja/core";
 import { asc, eq, getDb, schema } from "@forja/db";
-import { Badge, buttonClass, cx, Marca } from "@forja/ui";
+import { buttonClass, cx, linkAcessoClass, Marca } from "@forja/ui";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/session";
 
@@ -44,23 +44,24 @@ export default async function PrecosPage() {
   const destaque = "pro";
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
-        <Link href="/" className="flex items-center gap-2">
-          <Marca size={30} className="text-zinc-900" />
-          <span className="font-semibold">{APP_NAME}</span>
+    <div className="acesso relative min-h-dvh overflow-x-clip">
+      <div aria-hidden className="oficina-malha pointer-events-none absolute inset-x-0 top-0 h-[50rem]" />
+      <header className="relative mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-6">
+        <Link href="/" className="flex items-center gap-3">
+          <Marca size={34} className="text-aco-100" />
+          <span className="font-display text-2xl font-extrabold uppercase tracking-[0.22em] text-aco-100">{APP_NAME}</span>
         </Link>
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-5 text-sm">
           {user ? (
-            <Link href="/central" className={buttonClass("primary", "sm")}>
+            <Link href="/central" className={cx(buttonClass("brasa", "sm"), "px-3.5 py-2 text-sm")}>
               Abrir a {APP_NAME}
             </Link>
           ) : (
             <>
-              <Link href="/entrar" className={buttonClass("ghost", "sm")}>
+              <Link href="/entrar" className={linkAcessoClass()}>
                 Entrar
               </Link>
-              <Link href="/cadastro" className={buttonClass("primary", "sm")}>
+              <Link href="/cadastro" className={cx(buttonClass("brasa", "sm"), "px-3.5 py-2 text-sm")}>
                 Começar grátis
               </Link>
             </>
@@ -68,10 +69,13 @@ export default async function PrecosPage() {
         </nav>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 pb-20">
-        <section className="py-10 text-center">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Pague em reais pelo que usar</h1>
-          <p className="mx-auto mt-3 max-w-2xl text-zinc-600">
+      <main className="relative mx-auto max-w-6xl px-6 pb-24">
+        <section className="py-12">
+          <p className="font-mono text-[11px] uppercase tracking-[0.26em] text-aco-300">Planos e preços</p>
+          <h1 className="mt-3 font-display text-[clamp(2.75rem,7vw,5rem)] font-extrabold uppercase leading-[0.88] text-aco-100">
+            Pague em reais <span className="text-brasa">pelo que usar</span>
+          </h1>
+          <p className="mt-5 max-w-2xl text-aco-300">
             Claude, GPT, Gemini e Grok num só lugar. Cada plano traz créditos todo mês; quando precisar de mais, recarregue por Pix.
           </p>
         </section>
@@ -81,35 +85,32 @@ export default async function PrecosPage() {
             const porAssento = Boolean(p.minSeats);
             const ehDestaque = p.id === destaque;
             return (
-              <div
-                key={p.id}
-                className={cx(
-                  "flex flex-col rounded-xl border bg-white p-6 shadow-sm",
-                  ehDestaque ? "border-zinc-900 ring-1 ring-zinc-900" : "border-zinc-200",
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="font-semibold">{p.name}</h2>
-                  {ehDestaque ? <Badge tone="brand">Mais escolhido</Badge> : null}
+              <div key={p.id} className={cx("flex flex-col rounded-lg border bg-aco-850/70 p-6", ehDestaque ? "border-brasa/70" : "border-aco-700")}>
+                <div className="flex items-start justify-between gap-2">
+                  <h2 className="font-display text-2xl font-extrabold uppercase leading-none tracking-[0.04em] text-aco-100">{p.name}</h2>
+                  {ehDestaque ? (
+                    <span className="shrink-0 rounded-full border border-brasa/50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.16em] text-brasa-claro">
+                      Mais escolhido
+                    </span>
+                  ) : null}
                 </div>
-                <p className="mt-3 text-3xl font-semibold tabular-nums">
+                <p className="mt-4 text-3xl font-semibold tabular-nums text-aco-100">
                   {formatBrlCents(p.priceBrlCents)}
-                  <span className="text-sm font-normal text-zinc-500">{porAssento ? "/assento/mês" : "/mês"}</span>
+                  <span className="text-sm font-normal text-aco-300">{porAssento ? "/assento/mês" : "/mês"}</span>
                 </p>
-                <p className="mt-1 text-sm text-zinc-600">
+                <p className="mt-1 text-sm text-aco-100">
                   {formatBrlCents(p.includedCreditsBrlCents)} em créditos{porAssento ? " por assento" : ""} todo mês
                 </p>
-                <p className="mt-4 text-sm text-zinc-600">{p.description}</p>
-                <div className="mt-4 flex flex-wrap gap-1">
+                <p className="mt-4 text-sm leading-relaxed text-aco-300">{p.description}</p>
+                <div className="mt-4 flex flex-wrap gap-1.5">
                   {p.allowedTiers.map((t) => (
-                    <Badge key={t}>{TIER_LABELS[t]}</Badge>
+                    <span key={t} className="rounded border border-aco-700 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-aco-300">
+                      {TIER_LABELS[t]}
+                    </span>
                   ))}
                 </div>
                 <div className="mt-auto pt-6">
-                  <Link
-                    href={user ? "/plano#planos" : "/cadastro"}
-                    className={cx(buttonClass(ehDestaque ? "primary" : "secondary"), "w-full")}
-                  >
+                  <Link href={user ? "/plano#planos" : "/cadastro"} className={cx(buttonClass(ehDestaque ? "brasa" : "aco"), "w-full py-2.5")}>
                     {user ? `Assinar o ${p.name.split(" ")[0]}` : "Começar o teste grátis"}
                   </Link>
                 </div>
@@ -118,25 +119,25 @@ export default async function PrecosPage() {
           })}
         </section>
 
-        <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-6 text-sm text-zinc-600">
+        <section className="mt-6 rounded-lg border border-aco-700 bg-aco-850/70 p-6 text-sm leading-relaxed text-aco-300">
           <p>
-            <b className="text-zinc-900">Recargas avulsas</b> por Pix ou cartão:{" "}
+            <b className="font-medium text-aco-100">Recargas avulsas</b> por Pix ou cartão:{" "}
             {PACOTES_DE_RECARGA_CENTAVOS.map((v) => formatBrlCents(v)).join(", ")}. O crédito entra na hora.{" "}
-            <b className="text-zinc-900">Teste grátis</b>: {TRIAL_DAYS} dias com R$ 10 em créditos, sem cartão.
+            <b className="font-medium text-aco-100">Teste grátis</b>: {TRIAL_DAYS} dias com R$ 10 em créditos, sem cartão.
           </p>
         </section>
 
-        <section className="mx-auto mt-14 max-w-3xl">
-          <h2 className="mb-4 text-lg font-semibold">Perguntas frequentes</h2>
-          <dl className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white">
+        <section className="mx-auto mt-20 max-w-3xl">
+          <h2 className="mb-6 font-display text-4xl font-extrabold uppercase leading-none text-aco-100">Perguntas frequentes</h2>
+          <dl className="divide-y divide-aco-800 border-y border-aco-800">
             {PERGUNTAS.map((q) => (
-              <div key={q.p} className="p-5">
-                <dt className="font-medium text-zinc-900">{q.p}</dt>
-                <dd className="mt-1 text-sm text-zinc-600">{q.r}</dd>
+              <div key={q.p} className="py-5">
+                <dt className="font-medium text-aco-100">{q.p}</dt>
+                <dd className="mt-1.5 text-sm leading-relaxed text-aco-300">{q.r}</dd>
               </div>
             ))}
           </dl>
-          <p className="mt-6 text-center text-xs text-zinc-500">Preços em reais, cobrados mensalmente.</p>
+          <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-aco-300">Preços em reais, cobrados mensalmente.</p>
         </section>
       </main>
     </div>
