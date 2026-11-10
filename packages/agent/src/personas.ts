@@ -19,6 +19,10 @@ export interface DefinicaoDePersona {
   apelido: string;
   /** Uma palavra sobre o que ele faz, ao lado do nome. */
   oficio: string;
+  /** O que ele faz, em linguagem de cliente (site, página do time, chat). */
+  faz: string;
+  /** O que a pessoa recebe no fim. */
+  entrega: string;
   /** Papel, em poucas palavras. */
   nome: string;
   cargo: string;
@@ -57,6 +61,8 @@ export const PERSONAS: Record<Persona, DefinicaoDePersona> = {
     id: "dev_senior",
     apelido: "Dédalo",
     oficio: "arquiteto",
+    faz: "Desenha o caminho antes da obra. Lê o projeto inteiro, explica como ele está montado, aponta onde a arquitetura vai dar problema e decide o que vale mexer primeiro.",
+    entrega: "Visão geral do projeto, riscos técnicos e um plano de melhorias em ordem: agora, em seguida e depois, com impacto e esforço de cada item.",
     nome: "Dev Sênior",
     cargo: "Desenvolvedor Sênior",
     slug: "forja-dev-senior",
@@ -104,6 +110,8 @@ Explicar o projeto (o que é, como está organizado e como os dados fluem), aval
     id: "dev_pleno",
     apelido: "Brontes",
     oficio: "forjador",
+    faz: "Põe a mão no código. Implementa funcionalidades e correções seguindo o padrão do seu projeto, escreve os testes junto e avisa quando encontra algo torto pelo caminho.",
+    entrega: "As mudanças prontas num diff para você aprovar, com os testes e um resumo do que foi feito e por quê.",
     nome: "Dev Pleno",
     cargo: "Desenvolvedor Pleno",
     slug: "forja-dev-pleno",
@@ -143,6 +151,8 @@ Mudança de arquitetura, do modelo de dados ou de contrato público de API, troc
     id: "qa_pleno",
     apelido: "Argos",
     oficio: "inspetor",
+    faz: "Olha tudo antes de ir ao ar. Procura bugs e casos de borda, confere se os testes cobrem o que importa e revisa cada pull request, venha ele da Forja ou do seu assistente.",
+    entrega: "Lista de problemas com arquivo e linha, plano de teste e um veredito: pode seguir, seguir com ajustes ou não seguir.",
     nome: "QA Pleno",
     cargo: "Analista de QA Pleno",
     slug: "forja-qa-pleno",
@@ -194,6 +204,8 @@ Regra de negócio em teste unitário; banco, filas e APIs em teste de integraç�
     id: "seguranca_pleno",
     apelido: "Cérbero",
     oficio: "guardião",
+    faz: "Guarda a porta. Procura as falhas que alguém conseguiria explorar de verdade: acesso a dados de outro cliente, chaves expostas, webhooks sem assinatura e descuidos com a LGPD.",
+    entrega: "Cada vulnerabilidade com o cenário de ataque, a gravidade e a correção pronta para aplicar.",
     nome: "Cyber Security Pleno",
     cargo: "Analista de Cyber Security Pleno",
     slug: "forja-seguranca-pleno",

@@ -9,13 +9,29 @@ import { useEffect, useRef, useState } from "react";
 import { usageMeta } from "@/lib/format";
 import type { ModelOption } from "@/lib/models";
 
-/** Especialistas do time Forja (as instruções ficam no servidor). */
+/** Com quem falar. O texto diz o que cada um faz nesta conversa (as instruções completas ficam no servidor). */
 const PAPEIS = [
-  { id: "", label: "Assistente" },
-  { id: "dev_senior", label: "Dédalo · Dev Sênior" },
-  { id: "dev_pleno", label: "Brontes · Dev Pleno" },
-  { id: "qa_pleno", label: "Argos · QA Pleno" },
-  { id: "seguranca_pleno", label: "Cérbero · Cyber Security" },
+  { id: "", label: "Assistente", faz: "Responde de tudo um pouco: dúvidas, ideias, textos e código." },
+  {
+    id: "dev_senior",
+    label: "Dédalo, o arquiteto",
+    faz: "Dédalo (Dev Sênior) explica como o projeto está montado, avalia decisões de arquitetura e monta o plano de melhorias em ordem de prioridade.",
+  },
+  {
+    id: "dev_pleno",
+    label: "Brontes, o forjador",
+    faz: "Brontes (Dev Pleno) escreve o código da funcionalidade ou da correção que você pedir, no padrão do seu projeto e com os testes.",
+  },
+  {
+    id: "qa_pleno",
+    label: "Argos, o inspetor",
+    faz: "Argos (QA Pleno) procura bugs e casos de borda no que você mostrar, diz quais testes faltam e monta o plano de teste.",
+  },
+  {
+    id: "seguranca_pleno",
+    label: "Cérbero, o guardião",
+    faz: "Cérbero (Cyber Security) procura falhas que alguém conseguiria explorar, como acesso indevido a dados e chaves expostas, e entrega a correção.",
+  },
 ];
 
 interface Msg {
@@ -213,6 +229,10 @@ export function Chat(props: {
           </span>
         ) : null}
       </div>
+      <p className="border-b border-zinc-100 bg-zinc-50 px-4 py-2 text-xs text-zinc-600" data-testid="quem-responde" aria-live="polite">
+        <b className="font-medium text-zinc-900">Quem responde:</b> {(PAPEIS.find((p) => p.id === persona) ?? PAPEIS[0]!).faz}
+        {persona ? " Aqui ele não lê os arquivos do repositório: para isso, use a auditoria em Repositório." : ""}
+      </p>
 
       <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
         {messages.length === 0 ? (

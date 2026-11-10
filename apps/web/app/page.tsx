@@ -1,4 +1,5 @@
 import { formatBrlCents, PLAN_KIND_LABELS, TRIAL_DAYS, TRIAL_PLAN_ID } from "@forja/core";
+import { ORDEM_DAS_PERSONAS, PERSONAS } from "@forja/agent";
 import { asc, eq, getDb, schema } from "@forja/db";
 import { buttonClass, cx, linkAcessoClass, Marca } from "@forja/ui";
 import Link from "next/link";
@@ -25,12 +26,8 @@ const ETAPAS = [
   { nome: "No ar", grau: "1.100 °C", cor: "bg-brasa", texto: "Preview publicado na sua Vercel e migrações aplicadas no seu Supabase, com a sua confirmação. O link volta para a conversa." },
 ];
 
-const TIME = [
-  { nome: "Dédalo", oficio: "o arquiteto", cargo: "Dev Sênior", faz: "Explica o projeto, avalia a arquitetura e monta o plano de melhorias por impacto e esforço." },
-  { nome: "Brontes", oficio: "o forjador", cargo: "Dev Pleno", faz: "Implementa no padrão do seu código, com testes, e aponta melhorias por onde passa." },
-  { nome: "Argos", oficio: "o inspetor", cargo: "QA Pleno", faz: "Procura bugs e casos de borda, avalia os testes e revisa cada pull request." },
-  { nome: "Cérbero", oficio: "o guardião", cargo: "Cyber Security Pleno", faz: "Encontra vulnerabilidades exploráveis e entrega a correção, com atenção à LGPD." },
-];
+/** O time vem das mesmas definições que o app usa (nome, ofício, o que faz e o que entrega). */
+const TIME = ORDEM_DAS_PERSONAS.map((p) => PERSONAS[p]);
 
 const FAIXA = ["Claude", "ChatGPT", "Gemini", "Grok", "Claude Code", "Codex", "Gemini CLI", "Grok Build", "GitHub", "Vercel", "Supabase"];
 
@@ -249,16 +246,19 @@ export default async function Home() {
               Na auditoria do projeto e na revisão de cada pull request, quatro especialistas trabalham juntos, cada um no seu ofício. Cada achado diz quem encontrou, onde está e como corrigir.
             </p>
           </Revelar>
-          <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className="mt-10 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {TIME.map((t, i) => (
-              <Revelar como="li" key={t.nome} atraso={i * 100} className="cartao-vivo flex flex-col rounded-lg border border-aco-700 bg-aco-900 p-6">
-                <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-brasa-claro">{t.oficio}</p>
-                <h3 className="mt-2 font-display text-4xl font-extrabold uppercase leading-none tracking-[0.03em] text-aco-100">{t.nome}</h3>
-                <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-aco-300">{t.cargo}</p>
-                <p className="mt-4 text-sm leading-relaxed text-aco-300">{t.faz}</p>
+              <Revelar como="li" key={t.id} atraso={i * 100} className="cartao-vivo flex flex-col rounded-lg border border-aco-700 bg-aco-900 p-6">
+                <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-brasa-claro">o {t.oficio}</p>
+                <h3 className="mt-2 font-display text-4xl font-extrabold uppercase leading-none tracking-[0.03em] text-aco-100">{t.apelido}</h3>
+                <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-aco-300">{t.nome}</p>
+                <p className="mt-4 text-sm leading-relaxed text-aco-100">{t.faz}</p>
+                <p className="mb-6 mt-4 text-sm leading-relaxed text-aco-300">
+                  <span className="block font-mono text-[11px] uppercase tracking-[0.16em] text-palha">O que você recebe</span>
+                  {t.entrega}
+                </p>
                 <p className="mt-auto border-t border-aco-800 pt-4 font-mono text-[11px] leading-relaxed text-aco-300">
-                  <span className="text-palha">exemplo de achado</span>
-                  <br />
+                  <span className="mt-4 block text-palha">exemplo de achado</span>
                   {ACHADOS[i]}
                 </p>
               </Revelar>

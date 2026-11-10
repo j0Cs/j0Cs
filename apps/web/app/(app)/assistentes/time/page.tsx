@@ -30,7 +30,10 @@ export default function TimePage() {
               </div>
               <Badge tone="gray">{PERSONAS[p].nome}</Badge>
             </div>
-            <p className="text-sm text-zinc-700">{PERSONAS[p].resumo}</p>
+            <p className="text-sm text-zinc-800">{PERSONAS[p].faz}</p>
+            <p className="mt-2 text-sm text-zinc-600">
+              <b className="font-medium text-zinc-900">O que você recebe:</b> {PERSONAS[p].entrega}
+            </p>
             <details className="mt-3 text-sm">
               <summary className="cursor-pointer text-zinc-500 hover:text-zinc-900">Ver as instruções</summary>
               <pre className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-zinc-50 p-3 text-xs text-zinc-700">{PERSONAS[p].instrucoes}</pre>
