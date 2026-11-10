@@ -10,6 +10,7 @@ São dois produtos sobre o mesmo núcleo:
 |---|---|---|
 | `apps/web` (porta 3000) | Cliente | Central de comando, modo call (voz com o agente Hefesto), projetos, chat multi-modelo, conectores, equipe, custos e plano |
 | `apps/admin` (porta 3001) | Dono da plataforma | MRR, custo de API x receita, margem por cliente, chaves de API, catálogo e preços, planos, câmbio |
+| `apps/desktop` | Cliente (macOS e Windows) | O app web numa janela própria, mais pasta local, time nos arquivos e telemetria com um clique (doc 13) |
 
 ## Documentação
 
@@ -25,6 +26,7 @@ São dois produtos sobre o mesmo núcleo:
 10. [Operação e incidentes](docs/10-operacao-e-incidentes.md): alertas, backup, rotação de chaves e plano de incidente
 11. [Assinatura do cliente, time e QA](docs/11-assistentes-auditoria-e-time.md): time de especialistas, auditoria, revisão de PR, telemetria e conectores
 12. [Beta fechado](docs/12-beta-fechado.md): convites de fundador, primeiros passos, métricas, status e suporte
+13. [App desktop](docs/13-app-desktop.md): Electron para macOS e Windows, login pelo navegador, recursos locais, builds e assinatura
 
 Prompts prontos para o Cowork: [login com GitHub](docs/cowork/01-github-login.md) ·
 [e-mail no Microsoft 365](docs/cowork/02-microsoft-365-email.md)

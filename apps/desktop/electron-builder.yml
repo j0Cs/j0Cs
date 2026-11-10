@@ -1,0 +1,60 @@
+# Empacotamento do app desktop (doc 13). O código já vai num arquivo só (dist/), sem node_modules.
+appId: dev.forja.desktop
+productName: Forja
+copyright: Forja
+electronVersion: 45.2.3
+npmRebuild: false
+asar: true
+directories:
+  output: release
+  buildResources: recursos
+files:
+  - dist/**
+  - package.json
+extraResources:
+  - from: recursos
+    to: recursos
+    filter:
+      - icone.png
+      - bandeja*.png
+protocols:
+  - name: Forja
+    schemes: [forja]
+artifactName: Forja-${os}-${arch}.${ext}
+
+mac:
+  category: public.app-category.developer-tools
+  icon: recursos/icone.png
+  target: [dmg, zip]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: recursos/entitlements.mac.plist
+  entitlementsInherit: recursos/entitlements.mac.plist
+  extendInfo:
+    NSMicrophoneUsageDescription: A Forja usa o microfone só durante a chamada de voz com o Hefesto.
+dmg:
+  title: Forja ${version}
+
+win:
+  icon: recursos/icone.png
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: true
+  perMachine: false
+  shortcutName: Forja
+  uninstallDisplayName: Forja
+
+linux:
+  icon: recursos/icone.png
+  category: Development
+  executableName: forja
+  target: [dir]
+
+publish:
+  provider: github
+  owner: j0Cs
+  repo: j0Cs
+  tagNamePrefix: desktop-v
+  releaseType: release

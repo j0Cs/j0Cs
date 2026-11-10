@@ -11,3 +11,4 @@ export * from "./tarefas";
 export * from "./varredura";
 export * from "./vercel";
 export * from "./workspace";
+export type * from "./desktop";

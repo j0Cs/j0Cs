@@ -19,10 +19,12 @@ const PUBLIC = [
   "/precos",
   "/status",
   "/suporte",
+  "/baixar",
   "/api/auth",
   "/api/cron",
   "/api/stripe/webhook",
   "/api/otlp",
+  "/api/desktop",
 ];
 
 export function proxy(request: NextRequest) {

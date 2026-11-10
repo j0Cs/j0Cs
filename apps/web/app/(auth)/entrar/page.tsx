@@ -3,6 +3,7 @@ import { AvisoAcesso, buttonClass, CampoAcesso, inputAcessoClass, linkAcessoClas
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ActionForm } from "@/components/action-form";
+import { EntrarPeloNavegador } from "@/components/acesso/pelo-navegador";
 import { DivisoriaOu, TituloDeAcesso } from "@/components/acesso/titulo";
 import { getAuthUser } from "@/lib/session";
 import { githubAction, magicLinkAction, signInAction } from "../actions";
@@ -33,6 +34,7 @@ export default async function SignInPage({
         </div>
       ) : null}
 
+      <EntrarPeloNavegador />
       {isGithubLoginEnabled() ? (
         <>
           <form action={githubAction}>

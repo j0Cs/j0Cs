@@ -4,6 +4,7 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { magicLink, twoFactor } from "better-auth/plugins";
+import { loginDoDesktop } from "./desktop";
 import { emailLayout, sendEmail } from "./email";
 
 /*
@@ -117,6 +118,7 @@ function createWebAuth() {
           });
         },
       }),
+      loginDoDesktop(),
       nextCookies(),
     ],
   });
@@ -150,3 +152,4 @@ export { hashPassword } from "better-auth/crypto";
 export { sendEmail, emailLayout, escapeHtml } from "./email";
 export { authErrorMessage } from "./errors";
 export { caminhoInterno } from "./redirect";
+export { CABECALHO_DESKTOP, estadoValido, linkDoDesktop, VALIDADE_DO_CODIGO_MIN } from "./desktop";

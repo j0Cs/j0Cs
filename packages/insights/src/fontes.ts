@@ -11,7 +11,7 @@ import { recomendar, type UsoAgregado } from "./recomendacoes";
 export const hashDoToken = (token: string) => createHash("sha256").update(token).digest("hex");
 const PREFIXO = "fj_otlp_";
 
-export const ehFerramenta = (v: string): v is Ferramenta => v in FERRAMENTAS;
+export const ehFerramenta = (v: string): v is Ferramenta => Object.hasOwn(FERRAMENTAS, v);
 
 export async function criarFonte(db: Db, p: { orgId: string; userId: string; tool: Ferramenta; label?: string }) {
   const ativas = await db

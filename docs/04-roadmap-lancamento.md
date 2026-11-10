@@ -158,25 +158,29 @@ para parceiros aprovados (doc 11, seção 1).
 Objetivo: o mesmo produto num app instalável, com o que só dá para fazer na máquina do cliente. Fica para as últimas
 sprints, depois do núcleo web. Com o adiantamento das Sprints 3 e 4, cabe antes do beta, e o desktop entra no beta.
 
-- [ ] **[Claude]** Base: **Electron** carregando o app web, com janela, menu, bandeja, notificações, link `forja://`
+> **Sprint D1 feita em 10/11** (doc 13). Falta a D2 e o que depende das contas de assinatura.
+
+- [x] **[Claude]** Base: **Electron** carregando o app web, com janela, menu, bandeja, notificações, link `forja://`
   e login pelo navegador. Electron em vez de Tauri porque reaproveita direto o código TypeScript que já existe (leitura
   de estrutura, varredura, time, configuração da telemetria)
-- [ ] **[Claude]** Recursos locais:
-  - abrir uma pasta do computador e ler a estrutura sem GitHub;
+- [x] **[Claude]** Recursos locais (D1):
+  - abrir uma pasta do computador e ler a estrutura e a varredura sem GitHub;
   - instalar o time nos arquivos locais;
   - **configurar a telemetria** do Claude Code, do Codex e do Gemini CLI com um clique (edita `~/.claude/settings.json`,
-    `~/.codex/config.toml` etc., mostrando antes o que muda);
-  - auditoria e revisão da branch local.
+    `~/.codex/config.toml` e `~/.gemini/settings.json`, mostrando antes o que muda).
 
   As ferramentas do cliente continuam rodando por conta própria: o app não dirige o Claude Code com a assinatura do
   cliente, o que os termos também proíbem
-- [ ] **[Claude]** Builds e CI: GitHub Actions com macOS arm64 e x64 (`.dmg` de cada um ou universal) e Windows x64
-  (instalador NSIS; arm64 se houver demanda). Atualização automática pelos releases
+- [ ] **[Claude]** Recursos locais (D2): auditoria e revisão da branch local com o time
+- [x] **[Claude]** Builds e CI: GitHub Actions com macOS arm64 e x64 (`.dmg` de cada um) e Windows x64 (instalador
+  NSIS). Atualização automática pelos releases
+- [ ] **[Claude]** D2: assinatura do Windows no CI e Windows arm64 se houver demanda
+- [ ] **[Você]** Testar o instalador num Mac e num Windows de verdade
 - [ ] **[Você]** Conta **Apple Developer** (US$ 99/ano) para assinar e notarizar no macOS. Sem isso o Gatekeeper
-  bloqueia o app
+  avisa na primeira abertura e a atualização automática do Mac não funciona
 - [ ] **[Você]** Certificado de **assinatura de código do Windows** (Azure Trusted Signing, cerca de US$ 10/mês, ou um
   certificado OV/EV). Sem isso o SmartScreen avisa "editor desconhecido"
-- [ ] **[Claude]** Página de download que detecta o sistema e o processador
+- [x] **[Claude]** Página de download que detecta o sistema e o processador (`/baixar`)
 
 Pronto quando: o app instala e abre assinado no Mac (Intel e M1 ou mais novo) e no Windows; configura a telemetria do
 Claude Code local com um clique; e atualiza sozinho para uma versão nova.

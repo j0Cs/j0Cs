@@ -473,7 +473,7 @@ async function ferramentaDaAuditoria(chamada: AgentToolCall, relatorio: Relatori
       .slice(0, 4)
       .map((x) => ({ persona: x.persona as Persona, parecer: texto(x.parecer, 3_000) }));
     const v = String(chamada.input.veredito ?? "");
-    relatorio.veredito = v in VEREDITOS ? (v as Veredito) : null;
+    relatorio.veredito = Object.hasOwn(VEREDITOS, v) ? (v as Veredito) : null;
     return { output: "Análise encerrada.", isError: false, resumo: "Concluiu a análise", conclusao: texto(chamada.input.resumo, 8_000) || "Auditoria concluída." };
   }
   return { output: `A ferramenta ${chamada.name} não existe na auditoria (ela só lê).`, isError: true, resumo: `Ferramenta recusada: ${chamada.name}`, conclusao: null };

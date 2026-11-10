@@ -60,7 +60,7 @@ export function resumoDaEstrutura(e: EstruturaDoRepositorio) {
  */
 export async function instalarTimeNoRepositorio(db: Db, gh: GithubApp, p: { orgId: string; repoFullName: string; ferramentas: FerramentaDoTime[] }) {
   if (!NOME_DE_REPO.test(p.repoFullName)) throw new RegraDoAgente("Repositório inválido.");
-  const ferramentas = p.ferramentas.filter((f) => f in FERRAMENTAS_DO_TIME);
+  const ferramentas = p.ferramentas.filter((f) => Object.hasOwn(FERRAMENTAS_DO_TIME, f));
   if (!ferramentas.length) throw new RegraDoAgente("Escolha pelo menos uma ferramenta.");
   const instalacao = await instalacaoDaOrg(db, p.orgId);
   if (!instalacao) throw new RegraDoAgente("Conecte o GitHub em Agente antes de instalar o time.");

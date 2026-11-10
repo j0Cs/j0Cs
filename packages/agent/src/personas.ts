@@ -233,7 +233,7 @@ Para cada vulnerabilidade: onde (arquivo:linha), como seria explorada (cenário 
 };
 
 export const ORDEM_DAS_PERSONAS: Persona[] = ["dev_senior", "dev_pleno", "qa_pleno", "seguranca_pleno"];
-export const ehPersona = (v: unknown): v is Persona => typeof v === "string" && v in PERSONAS;
+export const ehPersona = (v: unknown): v is Persona => typeof v === "string" && Object.hasOwn(PERSONAS, v);
 
 /** Lista válida, sem repetição, na ordem do time; vazia vira o padrão. */
 export function personasValidas(lista: unknown, padrao: Persona[]): Persona[] {

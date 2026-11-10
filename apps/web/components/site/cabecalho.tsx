@@ -6,7 +6,7 @@ const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Forja";
 /** Cabeçalho e rodapé das páginas públicas simples (status, suporte). */
 export function CabecalhoDoSite() {
   return (
-    <header className="relative mx-auto flex max-w-4xl items-center justify-between gap-4 px-6 py-6">
+    <header className="relative mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-6 py-6">
       <Link href="/" className="flex items-center gap-3">
         <Marca size={34} className="text-aco-100" />
         <span className="font-display text-2xl font-extrabold uppercase tracking-[0.22em] text-aco-100">{APP_NAME}</span>
@@ -32,6 +32,9 @@ export function RodapeDoSite() {
       <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-4 px-6 py-8 font-mono text-[11px] uppercase tracking-[0.18em] text-aco-300">
         <span>{APP_NAME} · oficina de software</span>
         <span className="flex gap-6">
+          <Link href="/baixar" className={linkAcessoClass()}>
+            Baixar o app
+          </Link>
           <Link href="/status" className={linkAcessoClass()}>
             Status
           </Link>
