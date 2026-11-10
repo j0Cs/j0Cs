@@ -181,3 +181,15 @@ export function Notice({ tone = "amber", children }: { tone?: "amber" | "blue" |
   };
   return <div className={cx("rounded-lg border px-4 py-3 text-sm", tones[tone])}>{children}</div>;
 }
+
+/**
+ * Marca da Forja: o F em meandro (a grega dos templos de Hefesto) com a chama da forja no braço.
+ * O F usa a cor do texto (currentColor); a chama é sempre brasa.
+ */
+export function Marca({ size = 28, className }: { size?: number; className?: string }) {
+  return (
+    <svg viewBox="0 0 120 120" width={size} height={size} className={className} aria-hidden="true" focusable="false">
+      <path fill="none" strokeWidth="13" strokeLinecap="square" stroke="currentColor" d="M30 102 V20 H94 V44 H62"/><path fill="none" strokeWidth="13" strokeLinecap="square" stroke="currentColor" d="M43 70 H56"/><g transform="translate(16.9 48.3) scale(1.05)"><path fill="#ff6a1a" d="M62 12 C70 25 79 32 75 44 C73 50 67 53 62 53 C56 53 49 49 49 42 C49 33 58 29 62 12 Z"/><path fill="#ffb36b" d="M62 32 C66 38 69 41 67 46 C66 49 64 50 62 50 C59 50 56 48 56 45 C56 41 60 39 62 32 Z"/></g>
+    </svg>
+  );
+}

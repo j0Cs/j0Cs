@@ -1,3 +1,4 @@
+import { Marca } from "@forja/ui";
 import { formatBrlMicros } from "@forja/core";
 import { and, desc, eq, isNull, schema } from "@forja/db";
 import { ArrowRight, AudioLines, LayoutGrid, PenLine } from "lucide-react";
@@ -71,6 +72,7 @@ export default async function CentralPage({ searchParams }: { searchParams: Prom
       {/* faixa superior: leituras do painel */}
       <header className="flex items-center justify-between gap-4 border-b border-aco-800/80 px-4 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-aco-300 sm:px-8">
         <div className="flex min-w-0 items-center gap-3">
+          <Marca size={24} className="text-aco-100" />
           <span className="font-display text-base font-extrabold tracking-[0.18em] text-aco-100">FORJA</span>
           <span className="hidden truncate sm:inline">· oficina {org.name}</span>
         </div>

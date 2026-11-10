@@ -1,7 +1,7 @@
 import { PACOTES_DE_RECARGA_CENTAVOS } from "@forja/billing";
 import { formatBrlCents, TIER_LABELS, TRIAL_DAYS, TRIAL_PLAN_ID } from "@forja/core";
 import { asc, eq, getDb, schema } from "@forja/db";
-import { Badge, buttonClass, cx } from "@forja/ui";
+import { Badge, buttonClass, cx, Marca } from "@forja/ui";
 import Link from "next/link";
 import { getAuthUser } from "@/lib/session";
 
@@ -47,7 +47,7 @@ export default async function PrecosPage() {
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-4 py-5">
         <Link href="/" className="flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">{APP_NAME.slice(0, 1)}</span>
+          <Marca size={30} className="text-zinc-900" />
           <span className="font-semibold">{APP_NAME}</span>
         </Link>
         <nav className="flex items-center gap-2">

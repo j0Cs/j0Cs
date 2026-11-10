@@ -1,4 +1,4 @@
-import { linkAcessoClass } from "@forja/ui";
+import { linkAcessoClass, Marca } from "@forja/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Chamada } from "@/components/acesso/chamada";
@@ -18,7 +18,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="relative mx-auto grid min-h-dvh max-w-[90rem] lg:grid-cols-[minmax(0,1.15fr)_minmax(26rem,0.85fr)]">
         <section className="flex flex-col px-6 pt-6 sm:px-10 lg:py-10 lg:pl-14 lg:pr-16">
           <header className="flex items-center justify-between">
-            <Link href="/" className={`${linkAcessoClass()} flex items-baseline gap-3 no-underline hover:no-underline`}>
+            <Link href="/" className={`${linkAcessoClass()} flex items-center gap-3 no-underline hover:no-underline`}>
+              <Marca size={34} className="text-aco-100" />
               <span className="font-display text-2xl font-extrabold uppercase tracking-[0.22em] text-aco-100">{APP_NAME}</span>
               <span className="hidden font-mono text-[11px] uppercase tracking-[0.22em] text-aco-300 sm:inline">· oficina de software</span>
             </Link>

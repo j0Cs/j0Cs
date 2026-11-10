@@ -1,3 +1,4 @@
+import { Marca } from "@forja/ui";
 import type { ReactNode } from "react";
 import { TrilhoDeAcesso } from "@/components/trilho";
 
@@ -10,7 +11,8 @@ export default function AccessLayout({ children }: { children: ReactNode }) {
       <div aria-hidden className="oficina-malha pointer-events-none absolute inset-0" />
       <div className="relative mx-auto flex min-h-dvh max-w-md flex-col px-6 py-8">
         <header className="flex items-center justify-between gap-4">
-          <p className="flex items-baseline gap-3">
+          <p className="flex items-center gap-3">
+            <Marca size={34} className="text-aco-100" />
             <span className="font-display text-2xl font-extrabold uppercase tracking-[0.22em] text-aco-100">{APP_NAME}</span>
             <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-aco-300">· painel do dono</span>
           </p>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { Menu, X } from "lucide-react";
-import { cx } from "./index";
+import { cx, Marca } from "./index";
 
 export interface NavItem {
   href: string;
@@ -33,9 +33,7 @@ export function Shell({
   const sidebar = (
     <nav className="flex h-full flex-col">
       <div className="flex items-center gap-2 px-5 py-5">
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">
-          {brand.slice(0, 1)}
-        </span>
+        <Marca size={30} className="shrink-0 text-zinc-100" />
         <div>
           <p className="text-sm font-semibold text-white">{brand}</p>
           {tagline ? <p className="text-[11px] text-zinc-400">{tagline}</p> : null}
@@ -67,7 +65,10 @@ export function Shell({
       <aside className="hidden w-60 shrink-0 bg-zinc-950 lg:fixed lg:inset-y-0 lg:block">{sidebar}</aside>
 
       <div className="sticky top-0 z-20 flex items-center justify-between bg-zinc-950 px-4 py-3 lg:hidden">
-        <span className="text-sm font-semibold text-white">{brand}</span>
+        <span className="flex items-center gap-2 text-sm font-semibold text-white">
+          <Marca size={22} className="text-zinc-100" />
+          {brand}
+        </span>
         <button aria-label="Abrir menu" onClick={() => setOpen(true)} className="text-zinc-300">
           <Menu size={20} />
         </button>
