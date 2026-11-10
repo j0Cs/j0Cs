@@ -1,5 +1,5 @@
 import { usd, type PlanEconomicsAssumptions } from "./pricing";
-import type { CatalogModel, ModelTier, PlanDefinition, PricingSettings, TokenPrices } from "./types";
+import type { CatalogModel, ModelTier, PlanDefinition, PlanKind, PricingSettings, TokenPrices } from "./types";
 
 /**
  * Catálogo inicial de modelos (seed). Preços em US$/MTok conferidos nas páginas
@@ -254,10 +254,19 @@ export const TIER_LABELS: Record<ModelTier, string> = {
 export const TRIAL_PLAN_ID = "trial";
 export const TRIAL_DAYS = 7;
 
+export const PLAN_KIND_LABELS: Record<PlanKind, { nome: string; resumo: string }> = {
+  gestao: { nome: "Gestão", resumo: "Você constrói com as suas contas de IA. A Forja mostra o gasto, ensina a economizar e revisa o que foi feito." },
+  construcao: { nome: "Construir com a Forja", resumo: "A Forja constrói com os modelos dela: agente que abre pull request, chat multi-modelo e chamada de voz, pagos em créditos." },
+};
+
+/** O agente que implementa (escreve código e abre PR) só existe na linha de construção. */
+export const planoPermiteConstruir = (plano: { kind?: PlanKind | string | null } | null | undefined) => plano?.kind !== "gestao";
+
 export const DEFAULT_PLANS: PlanDefinition[] = [
   {
     id: TRIAL_PLAN_ID,
     name: "Teste grátis",
+    kind: "construcao",
     priceBrlCents: 0,
     includedCreditsBrlCents: 10_00,
     seats: 1,
@@ -267,49 +276,78 @@ export const DEFAULT_PLANS: PlanDefinition[] = [
     sortOrder: 0,
   },
   {
+    id: "gestao",
+    name: "Gestão",
+    kind: "gestao",
+    priceBrlCents: 59_00,
+    includedCreditsBrlCents: 15_00,
+    seats: 1,
+    maxProjects: 3,
+    allowedTiers: ["economico"],
+    description: "Para quem já paga Claude, ChatGPT, Gemini ou Grok: uso e gasto num painel, recomendações de economia, time de especialistas e revisão de QA.",
+    sortOrder: 1,
+  },
+  {
+    id: "gestao_equipe",
+    name: "Gestão Equipe (por assento)",
+    kind: "gestao",
+    priceBrlCents: 49_00,
+    includedCreditsBrlCents: 15_00,
+    seats: 1,
+    minSeats: 3,
+    maxProjects: null,
+    allowedTiers: ["economico", "intermediario"],
+    description: "Mínimo 3 assentos. O uso de cada pessoa e de cada ferramenta num painel só, com projetos ilimitados.",
+    sortOrder: 2,
+  },
+  {
     id: "starter",
     name: "Starter",
-    priceBrlCents: 147_00,
+    kind: "construcao",
+    priceBrlCents: 197_00,
     includedCreditsBrlCents: 80_00,
     seats: 1,
     maxProjects: 5,
     allowedTiers: ["economico", "intermediario"],
-    description: "Para começar: modelos rápidos e econômicos, 5 projetos.",
-    sortOrder: 1,
+    description: "Para começar a construir: modelos rápidos e econômicos, 5 projetos. Inclui tudo da Gestão.",
+    sortOrder: 3,
   },
   {
     id: "pro",
     name: "Pro",
-    priceBrlCents: 447_00,
+    kind: "construcao",
+    priceBrlCents: 597_00,
     includedCreditsBrlCents: 300_00,
     seats: 1,
     maxProjects: null,
     allowedTiers: ALL_TIERS,
     description: "Todos os modelos, incluindo Opus, Fable e Astra. Projetos ilimitados.",
-    sortOrder: 2,
+    sortOrder: 4,
   },
   {
     id: "max",
     name: "Max",
-    priceBrlCents: 997_00,
+    kind: "construcao",
+    priceBrlCents: 1297_00,
     includedCreditsBrlCents: 720_00,
     seats: 1,
     maxProjects: null,
     allowedTiers: ALL_TIERS,
     description: "Para quem usa agentes o dia inteiro.",
-    sortOrder: 3,
+    sortOrder: 5,
   },
   {
     id: "equipe",
     name: "Equipe (por assento)",
-    priceBrlCents: 397_00,
+    kind: "construcao",
+    priceBrlCents: 497_00,
     includedCreditsBrlCents: 260_00,
     seats: 1,
     minSeats: 3,
     maxProjects: null,
     allowedTiers: ALL_TIERS,
     description: "Mínimo 3 assentos; créditos somados num saldo único da empresa.",
-    sortOrder: 4,
+    sortOrder: 6,
   },
 ];
 

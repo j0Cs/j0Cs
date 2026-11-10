@@ -1,4 +1,4 @@
-import type { ModelPricing, ModelTier } from "@forja/core";
+import type { ModelPricing, ModelTier, PlanKind } from "@forja/core";
 import { sql } from "drizzle-orm";
 import {
   bigint,
@@ -133,6 +133,8 @@ export const plans = pgTable("plans", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
+  /** "gestao" (a pessoa usa as contas de IA dela) ou "construcao" (a Forja constrói com os modelos dela). */
+  kind: text("kind").notNull().default("construcao").$type<PlanKind>(),
   priceBrlCents: integer("price_brl_cents").notNull(),
   includedCreditsBrlCents: integer("included_credits_brl_cents").notNull(),
   seats: integer("seats").notNull().default(1),

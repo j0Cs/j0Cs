@@ -1,4 +1,4 @@
-import { formatBrlCents, TRIAL_DAYS, TRIAL_PLAN_ID } from "@forja/core";
+import { formatBrlCents, PLAN_KIND_LABELS, TRIAL_DAYS, TRIAL_PLAN_ID } from "@forja/core";
 import { asc, eq, getDb, schema } from "@forja/db";
 import { buttonClass, cx, linkAcessoClass, Marca } from "@forja/ui";
 import Link from "next/link";
@@ -222,27 +222,36 @@ export default async function Home() {
         <section className="mx-auto max-w-6xl px-6 py-24">
           <Sobre>Preços</Sobre>
           <Titulo>
-            Em reais, <span className="text-brasa">com créditos todo mês</span>
+            Com a sua conta <span className="text-brasa">ou com a nossa</span>
           </Titulo>
           <p className="mt-5 max-w-2xl text-aco-300">
-            Cada resposta debita o custo real do modelo usado. Quando os créditos acabam, você recarrega por Pix e o saldo entra na hora.
+            Já paga Claude, ChatGPT, Gemini ou Grok? A Gestão custa menos, porque os tokens são seus. Quer que a Forja construa? Os planos com créditos debitam o custo
+            real de cada resposta, e a recarga é por Pix.
           </p>
-          {planos.length ? (
-            <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {planos.map((p) => (
-                <li key={p.id} className={cx("rounded-lg border bg-aco-850/70 p-6", p.id === "pro" ? "border-brasa/70" : "border-aco-700")}>
-                  <h3 className="font-display text-2xl font-extrabold uppercase tracking-[0.04em] text-aco-100">{p.name}</h3>
-                  <p className="mt-3 text-3xl font-semibold tabular-nums text-aco-100">
-                    {formatBrlCents(p.priceBrlCents)}
-                    <span className="text-sm font-normal text-aco-300">{p.minSeats ? "/assento/mês" : "/mês"}</span>
-                  </p>
-                  <p className="mt-2 text-sm text-aco-300">
-                    {formatBrlCents(p.includedCreditsBrlCents)} em créditos{p.minSeats ? " por assento" : ""} todo mês
-                  </p>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          {(["gestao", "construcao"] as const).map((linha) => {
+            const daLinha = planos.filter((p) => (p.kind === "gestao") === (linha === "gestao"));
+            if (!daLinha.length) return null;
+            return (
+              <div key={linha} className="mt-10">
+                <h3 className="font-display text-2xl font-extrabold uppercase tracking-[0.04em] text-aco-100">{PLAN_KIND_LABELS[linha].nome}</h3>
+                <p className="mt-1 max-w-2xl text-sm text-aco-300">{PLAN_KIND_LABELS[linha].resumo}</p>
+                <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  {daLinha.map((p) => (
+                    <li key={p.id} className={cx("rounded-lg border bg-aco-850/70 p-6", p.id === "pro" ? "border-brasa/70" : "border-aco-700")}>
+                      <h4 className="font-display text-xl font-extrabold uppercase tracking-[0.04em] text-aco-100">{p.name}</h4>
+                      <p className="mt-3 text-3xl font-semibold tabular-nums text-aco-100">
+                        {formatBrlCents(p.priceBrlCents)}
+                        <span className="text-sm font-normal text-aco-300">{p.minSeats ? "/assento/mês" : "/mês"}</span>
+                      </p>
+                      <p className="mt-2 text-sm text-aco-300">
+                        {formatBrlCents(p.includedCreditsBrlCents)} em créditos{p.minSeats ? " por assento" : ""} todo mês
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
           <Link href="/precos" className={cx(linkAcessoClass(true), "mt-8 inline-block text-sm")}>
             Comparar os planos em detalhe →
           </Link>

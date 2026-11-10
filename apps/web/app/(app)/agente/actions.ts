@@ -18,6 +18,7 @@ import {
   publicarPreview,
   RegraDoAgente,
 } from "@forja/agent";
+import { planoPermiteConstruir } from "@forja/core";
 import { and, consumeRateLimit, eq, schema } from "@forja/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -31,9 +32,16 @@ const reais = (v: FormDataEntryValue | null) => {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 1_000_000) : null;
 };
 
+const planoDaOrg = (db: Awaited<ReturnType<typeof getSession>>["db"], planId: string | null) =>
+  planId ? db.query.plans.findFirst({ where: eq(schema.plans.id, planId) }) : Promise.resolve(undefined);
+
+const SO_CONSTRUCAO =
+  "O agente que escreve o código faz parte dos planos Construir com a Forja. No plano Gestão você constrói com o seu assistente, e a Forja audita e revisa. Mude de plano em Plano e cobrança.";
+
 export async function criarTarefaAction(_: FormState, f: FormData): Promise<FormState> {
-  const { db, org, user } = await getSession();
+  const { db, org, user, plan } = await getSession();
   if (!user.emailVerified) return { error: "Confirme seu e-mail antes de usar o agente." };
+  if (!planoPermiteConstruir(plan)) return { error: SO_CONSTRUCAO };
   if (!(await consumeRateLimit(db, `agente:criar:${org.id}`, 30, 3600))) return { error: "Muitas tarefas na última hora. Tente mais tarde." };
   const gh = await githubApp();
   if (!gh) return { error: "O GitHub ainda não está configurado na Forja. Fale com o suporte." };
@@ -187,6 +195,7 @@ export async function corrigirAchadosAction(auditoriaId: string, chaves: string[
     "",
     "Segredos expostos: não basta apagar do código. Mova para variáveis de ambiente e diga no resumo que a chave precisa ser trocada no serviço.",
   ].join("\n");
+  if (!planoPermiteConstruir(await planoDaOrg(db, org.planId))) return { erro: SO_CONSTRUCAO };
   if (!(await consumeRateLimit(db, `agente:criar:${org.id}`, 30, 3600))) return { erro: "Muitas tarefas na última hora. Tente mais tarde." };
   const gh = await githubApp();
   if (!gh) return { erro: "O GitHub ainda não está configurado na Forja." };

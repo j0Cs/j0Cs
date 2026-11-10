@@ -22,7 +22,7 @@ export default async function PlansPage() {
       <div className="space-y-6">
         {plans.map((p) => (
           <Card key={p.id}>
-            <CardHeader title={p.name} description={`id: ${p.id}`} />
+            <CardHeader title={p.name} description={`id: ${p.id} · linha: ${p.kind === "gestao" ? "Gestão (contas do cliente)" : "Construir com a Forja"}`} />
             <div className="grid gap-6 p-5 lg:grid-cols-2">
               <form action={updatePlan} className="grid gap-3 sm:grid-cols-2">
                 <input type="hidden" name="id" value={p.id} />

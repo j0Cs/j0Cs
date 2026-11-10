@@ -1,5 +1,5 @@
 import { PACOTES_DE_RECARGA_CENTAVOS } from "@forja/billing";
-import { formatBrlCents, TIER_LABELS, TRIAL_DAYS, TRIAL_PLAN_ID } from "@forja/core";
+import { formatBrlCents, PLAN_KIND_LABELS, TIER_LABELS, TRIAL_DAYS, TRIAL_PLAN_ID } from "@forja/core";
 import { asc, eq, getDb, schema } from "@forja/db";
 import { buttonClass, cx, linkAcessoClass, Marca } from "@forja/ui";
 import Link from "next/link";
@@ -9,10 +9,18 @@ const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Forja";
 
 export const metadata = {
   title: `Preços · ${APP_NAME}`,
-  description: "Planos em reais com créditos inclusos todo mês. Claude, GPT, Gemini e Grok num só lugar.",
+  description: "Duas linhas de plano em reais: Gestão, para quem constrói com as próprias contas de IA, e Construir com a Forja, com os nossos modelos.",
 };
 
 const PERGUNTAS = [
+  {
+    p: "Qual a diferença entre Gestão e Construir com a Forja?",
+    r: "Na Gestão você continua usando o seu Claude Code, Codex, Gemini CLI ou Grok Build, com a sua assinatura: a Forja mostra onde vão os tokens, recomenda como gastar menos, instala o time de especialistas no seu repositório e revisa os pull requests. Em Construir com a Forja, o nosso agente escreve o código e abre o pull request usando os nossos modelos, pagos com os créditos do plano. Tudo da Gestão vem junto.",
+  },
+  {
+    p: "Por que a Gestão é mais barata?",
+    r: "Porque os tokens da construção são os da sua conta, não os nossos. Você paga pelo painel, pelas recomendações e pelo time. Os créditos da Gestão cobrem a auditoria e a revisão de QA, que rodam nos modelos da Forja.",
+  },
   {
     p: "Como funcionam os créditos?",
     r: "Cada plano inclui créditos em reais todo mês. Cada resposta debita o custo real do modelo usado, e você acompanha tudo em Custos e uso. Os créditos do plano valem até a renovação.",
@@ -73,15 +81,26 @@ export default async function PrecosPage() {
         <section className="py-12">
           <p className="font-mono text-[11px] uppercase tracking-[0.26em] text-aco-300">Planos e preços</p>
           <h1 className="mt-3 font-display text-[clamp(2.75rem,7vw,5rem)] font-extrabold uppercase leading-[0.88] text-aco-100">
-            Pague em reais <span className="text-brasa">pelo que usar</span>
+            Com a sua conta <span className="text-brasa">ou com a nossa</span>
           </h1>
           <p className="mt-5 max-w-2xl text-aco-300">
-            Claude, GPT, Gemini e Grok num só lugar. Cada plano traz créditos todo mês; quando precisar de mais, recarregue por Pix.
+            Já paga Claude, ChatGPT, Gemini ou Grok? Fique na Gestão e pague menos. Quer que a Forja construa por você? Escolha um plano com créditos. Tudo em reais.
           </p>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {pagos.map((p) => {
+        {(["gestao", "construcao"] as const).map((linha) => (
+          <section key={linha} className="mb-14" data-linha={linha}>
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-aco-800 pb-4">
+              <div>
+                <h2 className="font-display text-4xl font-extrabold uppercase leading-none text-aco-100">{PLAN_KIND_LABELS[linha].nome}</h2>
+                <p className="mt-2 max-w-2xl text-sm text-aco-300">{PLAN_KIND_LABELS[linha].resumo}</p>
+              </div>
+              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-aco-300">
+                {linha === "gestao" ? "Tokens da sua conta" : "Tokens da Forja, em créditos"}
+              </span>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {pagos.filter((p) => (p.kind === "gestao") === (linha === "gestao")).map((p) => {
             const porAssento = Boolean(p.minSeats);
             const ehDestaque = p.id === destaque;
             return (
@@ -100,6 +119,7 @@ export default async function PrecosPage() {
                 </p>
                 <p className="mt-1 text-sm text-aco-100">
                   {formatBrlCents(p.includedCreditsBrlCents)} em créditos{porAssento ? " por assento" : ""} todo mês
+                  {p.kind === "gestao" ? " para auditoria e revisão" : ""}
                 </p>
                 <p className="mt-4 text-sm leading-relaxed text-aco-300">{p.description}</p>
                 <div className="mt-4 flex flex-wrap gap-1.5">
@@ -116,8 +136,10 @@ export default async function PrecosPage() {
                 </div>
               </div>
             );
-          })}
-        </section>
+              })}
+            </div>
+          </section>
+        ))}
 
         <section className="mt-6 rounded-lg border border-aco-700 bg-aco-850/70 p-6 text-sm leading-relaxed text-aco-300">
           <p>

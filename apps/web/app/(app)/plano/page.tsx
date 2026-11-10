@@ -6,8 +6,7 @@ import {
   formatBrlCents,
   formatBrlMicros,
   TIER_LABELS,
-  TRIAL_PLAN_ID,
-} from "@forja/core";
+  TRIAL_PLAN_ID, PLAN_KIND_LABELS } from "@forja/core";
 import { asc, eq, schema } from "@forja/db";
 import { Badge, Card, CardHeader, cx, EmptyState, inputBaseClass, Notice, PageHeader, Table, Td, Th } from "@forja/ui";
 import { FormCobranca } from "@/components/form-cobranca";
@@ -123,12 +122,20 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
         </Card>
       </div>
 
-      <h2 id="planos" className="mb-3 text-sm font-semibold text-zinc-900">
+      <h2 id="planos" className="mb-1 text-sm font-semibold text-zinc-900">
         Planos
       </h2>
-      <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <p className="mb-4 max-w-3xl text-sm text-zinc-600">
+        Duas linhas. Na <b>Gestão</b> você constrói com as suas contas de IA e a Forja cuida do uso, da economia e da revisão. Em <b>Construir com a Forja</b> o agente
+        escreve o código com os nossos modelos, pagos em créditos, e tudo da Gestão vem junto.
+      </p>
+      {(["gestao", "construcao"] as const).map((linha) => (
+      <section key={linha} className="mb-8">
+        <h3 className="text-sm font-semibold text-zinc-900">{PLAN_KIND_LABELS[linha].nome}</h3>
+        <p className="mb-3 max-w-3xl text-xs text-zinc-500">{PLAN_KIND_LABELS[linha].resumo}</p>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {plans
-          .filter((p) => p.priceBrlCents > 0)
+          .filter((p) => p.priceBrlCents > 0 && (p.kind === "gestao") === (linha === "gestao"))
           .map((p) => {
             const atual = p.id === org.planId && ativa;
             const porAssento = Boolean(p.minSeats);
@@ -182,6 +189,8 @@ export default async function PlanPage({ searchParams }: { searchParams: Promise
             );
           })}
       </div>
+      </section>
+      ))}
       {ativa && online && gerencia ? (
         <p className="-mt-5 mb-8 text-xs text-zinc-500">
           Para um plano maior, a troca vale na hora e cobra só a diferença proporcional (os créditos da diferença entram junto). Para um

@@ -1,4 +1,5 @@
 import { githubApp, instalacaoDaOrg, LIMITES, pedidoDaConversa } from "@forja/agent";
+import { planoPermiteConstruir } from "@forja/core";
 import { and, eq, schema } from "@forja/db";
 import { buttonClass, Card, Field, inputClass, Notice, PageHeader } from "@forja/ui";
 import Link from "next/link";
@@ -17,6 +18,20 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export default async function NovaTarefaPage({ searchParams }: { searchParams: Promise<{ projeto?: string; conversa?: string }> }) {
   const { projeto, conversa } = await searchParams;
   const { db, org, plan } = await getSession();
+  if (!planoPermiteConstruir(plan)) {
+    return (
+      <>
+        <PageHeader title="Nova tarefa" />
+        <Notice tone="blue">
+          No plano <b>{plan?.name ?? "Gestão"}</b> você constrói com o seu assistente (Claude Code, Codex, Gemini CLI ou Grok Build), e a Forja audita o projeto e revisa os
+          pull requests. O agente que escreve o código faz parte dos planos Construir com a Forja.{" "}
+          <Link href="/plano#planos" className="font-medium underline">
+            Ver os planos
+          </Link>
+        </Notice>
+      </>
+    );
+  }
   const instalacao = await instalacaoDaOrg(db, org.id);
   if (!instalacao) {
     return (

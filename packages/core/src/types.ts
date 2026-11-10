@@ -90,9 +90,16 @@ export interface ChatMessage {
   content: string;
 }
 
+/**
+ * Linha do plano. "gestao": a pessoa constrói com as contas de IA dela e a Forja gerencia (uso,
+ * economia, time, QA). "construcao": a Forja constrói com os modelos dela, pagos em créditos.
+ */
+export type PlanKind = "gestao" | "construcao";
+
 export interface PlanDefinition {
   id: string;
   name: string;
+  kind: PlanKind;
   priceBrlCents: number;
   /** Créditos incluídos por ciclo, em centavos de real. */
   includedCreditsBrlCents: number;

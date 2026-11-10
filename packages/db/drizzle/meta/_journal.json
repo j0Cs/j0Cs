@@ -71,6 +71,13 @@
       "when": 1794328200236,
       "tag": "0009_beta_fechado",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794331143479,
+      "tag": "0010_planos_em_duas_linhas",
+      "breakpoints": true
     }
   ]
 }

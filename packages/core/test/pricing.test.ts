@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MODELS, DEFAULT_PLANS, DEFAULT_PRICING_SETTINGS } from "../src/catalog";
+import { DEFAULT_MODELS, DEFAULT_PLANS, DEFAULT_PRICING_SETTINGS, planoPermiteConstruir } from "../src/catalog";
 import {
   computeChargeBrlMicros,
   computeCostUsdMicros,
@@ -86,9 +86,24 @@ describe("simulatePlan", () => {
     });
     const full = rows.find((r) => r.utilizationPercent === 100)!;
     expect(full.apiCostBrl).toBe(200);
-    expect(full.netRevenueBrl).toBe(379.95);
-    expect(full.grossProfitBrl).toBe(159.95);
+    expect(full.netRevenueBrl).toBe(507.45);
+    expect(full.grossProfitBrl).toBe(287.45);
     expect(full.grossMarginPercent).toBeGreaterThan(30);
+  });
+
+  it("planos de gestão custam menos que os de construção e fecham no positivo", () => {
+    const economia = { revenueTaxPercent: 11, paymentFeePercent: 4, blendedMarkupPercent: 50, infraPerSeatBrlCents: 20_00 };
+    const gestao = DEFAULT_PLANS.filter((p) => p.kind === "gestao");
+    const construcao = DEFAULT_PLANS.filter((p) => p.kind === "construcao" && p.priceBrlCents > 0);
+    expect(gestao.length).toBeGreaterThan(0);
+    expect(Math.max(...gestao.map((p) => p.priceBrlCents))).toBeLessThan(Math.min(...construcao.map((p) => p.priceBrlCents)));
+    for (const p of gestao) expect(simulatePlan(p, economia).find((r) => r.utilizationPercent === 100)!.grossProfitBrl).toBeGreaterThan(0);
+  });
+
+  it("só a linha de construção libera o agente que implementa", () => {
+    expect(planoPermiteConstruir({ kind: "gestao" })).toBe(false);
+    expect(planoPermiteConstruir({ kind: "construcao" })).toBe(true);
+    expect(planoPermiteConstruir(undefined)).toBe(true);
   });
 });
 
