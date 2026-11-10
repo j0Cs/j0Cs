@@ -151,6 +151,15 @@ export const organizations = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
+    /** Dados de cadastro pedidos nas boas-vindas. O documento fica só com dígitos e letras (CPF ou CNPJ). */
+    documentType: text("document_type").$type<"cpf" | "cnpj">(),
+    document: text("document"),
+    phone: text("phone"),
+    teamSize: text("team_size"),
+    /** Como a empresa disse que vai usar: "gestao" (as contas de IA dela), "construcao" (a Forja constrói) ou "ambos". */
+    intendedUse: text("intended_use").$type<"gestao" | "construcao" | "ambos">(),
+    /** Quando terminou as boas-vindas. Vazio: o app leva para /boas-vindas. */
+    onboardedAt: timestamp("onboarded_at", { withTimezone: true }),
     slug: text("slug").notNull().unique(),
     status: orgStatusEnum("status").notNull().default("active"),
     /** Por que está suspensa: "inadimplencia" (reativa sozinha quando o pagamento entra) ou "manual". */

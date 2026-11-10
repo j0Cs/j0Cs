@@ -51,8 +51,8 @@ export const CONECTORES: DefinicaoDeConector[] = [
   { type: "firebase", name: "Firebase", categoria: "banco", description: "Firestore e Auth do Google.", uso: "", credentialLabel: "", credentialHint: "", available: false },
   { type: "mongodb_atlas", name: "MongoDB Atlas", categoria: "banco", description: "MongoDB gerenciado.", uso: "", credentialLabel: "", credentialHint: "", available: false },
   // gasto com APIs
-  { type: "anthropic_admin", name: "Anthropic (Claude API)", categoria: "gasto_ia", description: "Gasto diário da sua organização na API do Claude, em Assistentes de IA.", uso: "Lê o relatório de custo da sua organização (nunca faz chamadas aos modelos).", credentialLabel: "Admin API key", credentialHint: "console.anthropic.com → Settings → Admin keys (começa com sk-ant-admin). Só leitura de relatórios é usada.", available: true },
-  { type: "openai_admin", name: "OpenAI API", categoria: "gasto_ia", description: "Gasto diário da sua organização na API da OpenAI, em Assistentes de IA.", uso: "Lê o relatório de custo da sua organização (nunca faz chamadas aos modelos).", credentialLabel: "Admin key", credentialHint: "platform.openai.com → Settings → Organization → Admin keys.", available: true },
+  { type: "anthropic_admin", name: "Anthropic (Claude API)", categoria: "gasto_ia", description: "Gasto diário da sua organização na API do Claude, em Minhas IAs.", uso: "Lê o relatório de custo da sua organização (nunca faz chamadas aos modelos).", credentialLabel: "Admin API key", credentialHint: "console.anthropic.com → Settings → Admin keys (começa com sk-ant-admin). Só leitura de relatórios é usada.", available: true },
+  { type: "openai_admin", name: "OpenAI API", categoria: "gasto_ia", description: "Gasto diário da sua organização na API da OpenAI, em Minhas IAs.", uso: "Lê o relatório de custo da sua organização (nunca faz chamadas aos modelos).", credentialLabel: "Admin key", credentialHint: "platform.openai.com → Settings → Organization → Admin keys.", available: true },
 ];
 
 export interface ResultadoDaVerificacao {

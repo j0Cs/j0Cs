@@ -192,7 +192,7 @@ const email = process.env.DEV_USER_EMAIL ?? "demo@forja.dev";
 const user = await ensureUser({ email, name: "Usuário Demo", password: process.env.DEV_USER_PASSWORD ?? "demo12345" });
 let org = await db.query.organizations.findFirst({ where: eq(organizations.slug, "demo") });
 if (!org) {
-  [org] = await db.insert(organizations).values({ name: "Empresa Demo", slug: "demo", planId: "pro" }).returning();
+  [org] = await db.insert(organizations).values({ name: "Empresa Demo", slug: "demo", planId: "pro", onboardedAt: new Date() }).returning();
   await db.insert(memberships).values({ orgId: org!.id, userId: user!.id, role: "owner" });
   const now = new Date();
   const end = new Date(now);

@@ -62,15 +62,32 @@ export async function signInAction(_: FormState, f: FormData): Promise<FormState
     await Promise.all([refundRateLimit(db, par), refundRateLimit(db, conta)]); // recusada nem chegou a tentar
     return MUITAS;
   }
+  let segundaEtapa = false;
   try {
-    await getWebAuth().api.signInEmail({
+    const res = await getWebAuth().api.signInEmail({
       body: { email, password: String(f.get("password") ?? ""), rememberMe: true },
       headers: await headers(),
     });
+    segundaEtapa = "twoFactorRedirect" in res && Boolean(res.twoFactorRedirect);
   } catch (err) {
     return { error: authErrorMessage(err) }; // a falha fica contada
   }
   await Promise.all([refundRateLimit(db, par), refundRateLimit(db, conta)]); // deu certo: não é falha
+  const depois = safeNext(str(f, "next"));
+  redirect(segundaEtapa ? `/entrar/verificar?next=${encodeURIComponent(depois)}` : depois);
+}
+
+/** Segunda etapa do login: código do app autenticador (6 dígitos) ou um código de backup. */
+export async function verificarSegundaEtapaAction(_: FormState, f: FormData): Promise<FormState> {
+  const codigo = str(f, "code").replace(/\s/g, "");
+  if (!(await dentroDoLimite([[`login:2fa:ip:${await ipDoCliente()}`, 20, JANELA_LOGIN]]))) return MUITAS;
+  try {
+    const api = getWebAuth().api;
+    if (codigo.length > 6) await api.verifyBackupCode({ body: { code: codigo }, headers: await headers() });
+    else await api.verifyTOTP({ body: { code: codigo }, headers: await headers() });
+  } catch (err) {
+    return { error: authErrorMessage(err) };
+  }
   redirect(safeNext(str(f, "next")));
 }
 

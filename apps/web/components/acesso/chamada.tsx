@@ -29,6 +29,24 @@ const CHAMADAS: { prefixo: string; sobre?: string; linhas: [string, string]; tex
     texto: "Projetos, conversas e créditos ficam com o time. Entre e comece a trabalhar junto.",
   },
   {
+    prefixo: "/boas-vindas",
+    sobre: "Boas-vindas · 4 etapas curtas",
+    linhas: ["Prepare a", "bancada"],
+    texto: "Dados da empresa, como você vai usar, a proteção da conta e onde ficam os seus números. Depois disso é só trabalhar.",
+  },
+  {
+    prefixo: "/conta",
+    sobre: "Segurança",
+    linhas: ["Tranque a", "oficina"],
+    texto: "A conta guarda projetos, repositórios e cobrança. Com a verificação em duas etapas, só a senha não basta para entrar.",
+  },
+  {
+    prefixo: "/desktop",
+    sobre: "App para computador",
+    linhas: ["A forja na", "sua máquina"],
+    texto: "Confirme para o app entrar com a conta que já está aberta neste navegador.",
+  },
+  {
     prefixo: "/onboarding",
     sobre: "Último passo",
     linhas: ["Monte a", "oficina"],

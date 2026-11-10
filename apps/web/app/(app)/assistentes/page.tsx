@@ -6,7 +6,15 @@ import { getSession } from "@/lib/session";
 import { revogarFonteAction } from "./actions";
 import { ConectarFerramenta } from "./conectar";
 
-export const metadata = { title: "Assistentes de IA" };
+export const metadata = { title: "Minhas IAs" };
+
+/** As contas que o cliente já tem, cada uma ligada pela ferramenta de código dela. */
+const CONTAS: { nome: string; empresa: string; planos: string; ferramenta: Ferramenta; gasto?: "anthropic_admin" | "openai_admin" }[] = [
+  { nome: "Claude", empresa: "Anthropic", planos: "Pro, Max, Team ou API", ferramenta: "claude_code", gasto: "anthropic_admin" },
+  { nome: "ChatGPT", empresa: "OpenAI", planos: "Plus, Pro, Business ou API", ferramenta: "codex", gasto: "openai_admin" },
+  { nome: "Gemini", empresa: "Google", planos: "Google AI Pro, Ultra ou API", ferramenta: "gemini_cli" },
+  { nome: "Grok", empresa: "xAI", planos: "SuperGrok ou API", ferramenta: "grok_build" },
+];
 
 const quando = (d: Date | null) => (d ? d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }) : "nunca");
 const mil = (n: number) =>
@@ -39,32 +47,115 @@ export default async function AssistentesPage() {
   return (
     <>
       <PageHeader
-        title="Assistentes de IA"
-        description="Conecte o Claude Code, o Codex, o Gemini CLI e o Grok Build da sua equipe para ver onde vão os tokens e como gastar menos. Funciona com assinatura (Pro, Max, Plus…) ou API: a própria ferramenta manda o uso. A Forja nunca usa o seu login nem vê seus prompts."
+        title="Minhas IAs"
+        description="Conecte aqui as contas de IA que você já usa: Claude, ChatGPT, Gemini e Grok. A Forja passa a mostrar quantos tokens cada uma gasta, quanto isso custa e como gastar menos. Vale para assinatura (Pro, Max, Plus…) e para API."
+        actions={
+          <Link href="/assistentes/time" className={buttonClass("secondary", "sm")}>
+            Ver o time de especialistas
+          </Link>
+        }
       />
+
+      <h2 className="mb-1 text-sm font-semibold text-zinc-900">Contas de IA</h2>
+      <p className="mb-3 max-w-3xl text-sm text-zinc-600">
+        Cada conta se conecta pela ferramenta de código dela, que você já tem instalada. Ela envia só os números de cada pedido (modelo, tokens, custo e duração). Seus
+        prompts, respostas e código não saem da sua máquina.
+      </p>
+      <div className="mb-3 grid gap-4 md:grid-cols-2" data-testid="contas-de-ia">
+        {CONTAS.map((c) => {
+          const fontes = ativas.filter((f) => f.tool === c.ferramenta);
+          const visto = fontes.map((f) => f.lastSeenAt).filter((d): d is Date => Boolean(d)).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+          const gasto = c.gasto ? gastos.find((g) => g.provedor === c.gasto) : undefined;
+          return (
+            <Card key={c.ferramenta} className="p-5">
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-zinc-900">{c.nome}</p>
+                  <p className="text-xs text-zinc-500">
+                    {c.empresa} · {c.planos}
+                  </p>
+                </div>
+                {fontes.length ? (
+                  <Badge tone={visto ? "green" : "amber"}>{visto ? "conectada" : "aguardando o primeiro uso"}</Badge>
+                ) : (
+                  <Badge tone="gray">não conectada</Badge>
+                )}
+              </div>
+              <p className="mb-3 text-sm text-zinc-700">
+                {fontes.length
+                  ? `${fontes.length} ${fontes.length === 1 ? "máquina conectada" : "máquinas conectadas"} pelo ${FERRAMENTAS[c.ferramenta].nome}. ${visto ? `Último uso recebido ${quando(visto)}.` : "Abra a ferramenta e faça um pedido para o uso aparecer."}`
+                  : `Conecte pelo ${FERRAMENTAS[c.ferramenta].nome}: gere a configuração, cole no arquivo indicado e reabra a ferramenta.`}
+              </p>
+              <ConectarFerramenta tool={c.ferramenta} nome={FERRAMENTAS[c.ferramenta].nome} />
+              {c.gasto ? (
+                <p className="mt-3 border-t border-zinc-100 pt-3 text-xs text-zinc-600">
+                  {gasto ? (
+                    <>
+                      Gasto real da API conectado: <b className="text-zinc-900">{usd(gasto.totalUsdMicros)}</b> em 30 dias.{" "}
+                    </>
+                  ) : (
+                    <>Usa a API da {c.empresa} em produção? Conecte a chave de administração para ver o valor cobrado de verdade. </>
+                  )}
+                  <Link href="/conectores" className="font-medium text-zinc-900 underline">
+                    {gasto ? "Gerenciar" : "Conectar o gasto da API"}
+                  </Link>
+                </p>
+              ) : null}
+            </Card>
+          );
+        })}
+      </div>
+      <div className="mb-6 grid gap-4 md:grid-cols-2">
+        <Card className="p-5">
+          <p className="font-medium text-zinc-900">No app para computador é um clique</p>
+          <p className="mt-1 text-sm text-zinc-600">
+            O app da Forja acha o Claude Code, o Codex e o Gemini CLI instalados e grava a configuração para você, mostrando antes o que muda.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href="/computador" className={buttonClass("secondary", "sm")}>
+              Abrir Este computador
+            </Link>
+            <Link href="/baixar" className={buttonClass("ghost", "sm")}>
+              Baixar o app
+            </Link>
+          </div>
+        </Card>
+        <Card className="p-5">
+          <p className="font-medium text-zinc-900">Usa outra IA?</p>
+          <p className="mt-1 text-sm text-zinc-600">
+            DeepSeek, Mistral, Cursor, Copilot, Windsurf e outras ainda não mandam o uso para a Forja. Conte qual você usa: a ordem de entrada segue os pedidos.
+          </p>
+          <Link href="/suporte" className={cx(buttonClass("secondary", "sm"), "mt-3")}>
+            Pedir outra IA
+          </Link>
+        </Card>
+      </div>
+
+      <details className="mb-6 rounded-xl border border-zinc-200 bg-white px-5 py-4 text-sm text-zinc-700">
+        <summary className="cursor-pointer font-medium text-zinc-900">Por que não existe o botão "Entrar com o ChatGPT" ou "Entrar com o Claude"?</summary>
+        <p className="mt-2">
+          Porque os termos da Anthropic, da Google e da OpenAI proíbem que outro produto use o login da sua assinatura. Quem faz isso arrisca a conta do cliente. A Forja
+          nunca pede a sua senha nem o seu token dessas contas: quem fala com o modelo é a ferramenta oficial, na sua máquina, e ela só nos conta os números.
+        </p>
+      </details>
 
       <Card className="mb-6">
         <CardHeader
-          title="Construa com a sua assinatura, revise com a Forja"
-          description="O seu Claude Code, Codex, Gemini CLI ou Grok Build roda na sua máquina, com o seu plano. A Forja entra como o time de especialistas e o QA."
-          actions={
-            <Link href="/assistentes/time" className={buttonClass("secondary", "sm")}>
-              Ver o time
-            </Link>
-          }
+          title="Construa com a sua conta, revise com a Forja"
+          description="O caminho completo para quem já paga uma IA."
         />
         <ol className="grid gap-3 px-5 pb-5 text-sm text-zinc-700 md:grid-cols-4">
           <li className="rounded-lg bg-zinc-50 p-3">
-            <b className="block text-zinc-900">1. Instale o time</b>
-            No repositório do projeto: Dev Sênior, Dev Pleno, QA Pleno e Cyber Security Pleno viram subagentes, skills e instruções da sua ferramenta.
+            <b className="block text-zinc-900">1. Conecte a conta</b>
+            Acima. Em minutos o uso começa a aparecer aqui, por ferramenta, modelo, dia e pessoa.
           </li>
           <li className="rounded-lg bg-zinc-50 p-3">
-            <b className="block text-zinc-900">2. Construa com o seu plano</b>
-            Use a ferramenta como sempre, com a sua conta. Nada passa pela Forja nem gasta os seus créditos daqui.
+            <b className="block text-zinc-900">2. Instale o time</b>
+            No repositório do projeto: Dev Sênior, Dev Pleno, QA Pleno e Cyber Security Pleno viram subagentes e instruções da sua ferramenta.
           </li>
           <li className="rounded-lg bg-zinc-50 p-3">
-            <b className="block text-zinc-900">3. Conecte o uso</b>
-            Abaixo: a ferramenta manda só os números (tokens, cache, modelo) e a Forja mostra onde economizar.
+            <b className="block text-zinc-900">3. Construa como sempre</b>
+            Com a sua conta e o seu plano. Nada passa pela Forja nem gasta os seus créditos daqui.
           </li>
           <li className="rounded-lg bg-zinc-50 p-3">
             <b className="block text-zinc-900">4. Peça a revisão de QA</b>
@@ -72,21 +163,6 @@ export default async function AssistentesPage() {
           </li>
         </ol>
       </Card>
-
-      <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {(Object.keys(FERRAMENTAS) as Ferramenta[]).map((t) => (
-          <Card key={t} className="p-5">
-            <div className="mb-3 flex items-start justify-between gap-2">
-              <div>
-                <p className="font-medium text-zinc-900">{FERRAMENTAS[t].nome}</p>
-                <p className="text-xs text-zinc-500">{FERRAMENTAS[t].empresa}</p>
-              </div>
-              {ativas.some((f) => f.tool === t) ? <Badge tone="green">conectado</Badge> : null}
-            </div>
-            <ConectarFerramenta tool={t} nome={FERRAMENTAS[t].nome} />
-          </Card>
-        ))}
-      </div>
 
       <Card className="mb-6">
         <CardHeader

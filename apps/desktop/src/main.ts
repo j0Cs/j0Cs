@@ -242,7 +242,7 @@ const TELAS: [string, string, string?][] = [
   ["Central", "/central", "CmdOrCtrl+1"],
   ["Projetos", "/projetos", "CmdOrCtrl+2"],
   ["Agente", "/agente", "CmdOrCtrl+3"],
-  ["Assistentes de IA", "/assistentes", "CmdOrCtrl+4"],
+  ["Minhas IAs", "/assistentes", "CmdOrCtrl+4"],
   ["Este computador", "/computador", "CmdOrCtrl+5"],
 ];
 

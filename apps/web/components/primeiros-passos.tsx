@@ -14,12 +14,20 @@ export async function PrimeirosPassos({ db, org, emailConfirmado }: { db: Db; or
       projeto: sql<string | null>`(select p.id::text from projects p where p.org_id = ${org.id} and p.archived_at is null order by p.created_at limit 1)`,
       respostas: sql<number>`(select count(*)::int from usage_events e where e.org_id = ${org.id} and e.status = 'ok')`,
       github: sql<number>`(select count(*)::int from github_installations g where g.org_id = ${org.id})`,
+      ias: sql<number>`(select count(*)::int from ai_telemetry_sources f where f.org_id = ${org.id} and f.revoked_at is null)`,
     })
     .from(schema.organizations)
     .where(eq(schema.organizations.id, org.id));
   const projeto = linha?.projeto ?? null;
   const passos = [
     { feito: emailConfirmado, titulo: "Confirme seu e-mail", texto: "Abra o link que mandamos. Sem isso os modelos não respondem.", href: null as string | null, acao: "" },
+    {
+      feito: (linha?.ias ?? 0) > 0,
+      titulo: "Conecte uma conta de IA",
+      texto: "Claude, ChatGPT, Gemini ou Grok que você já paga: a Forja mostra os tokens e o gasto de cada uma.",
+      href: "/assistentes",
+      acao: "Conectar",
+    },
     { feito: Boolean(projeto), titulo: "Crie o primeiro projeto", texto: "Um projeto guarda as conversas, as instruções e o repositório de um sistema.", href: "#novo-projeto", acao: "Criar projeto" },
     {
       feito: (linha?.respostas ?? 0) > 0,

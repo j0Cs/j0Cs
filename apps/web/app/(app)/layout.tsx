@@ -3,6 +3,7 @@ import { Notice } from "@forja/ui";
 import { Shell } from "@forja/ui/shell";
 import { Bot, BrainCircuit, CreditCard, FolderKanban, Gauge, Laptop, LogOut, Orbit, Plug, Users } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/session";
 import { ConfirmarEmail } from "@/components/confirmar-email";
@@ -12,6 +13,7 @@ const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Forja";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const { org, plan, user } = await getSession();
+  if (!org.onboardedAt) redirect("/boas-vindas");
   const bloqueio = bloqueioDaOrg(org);
   const diasDeTeste = org.planId === TRIAL_PLAN_ID ? diasRestantesDoTeste(org.trialEndsAt) : null;
   const diasDeCarencia = org.pastDueSince
@@ -23,9 +25,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       tagline={org.name}
       nav={[
         { href: "/central", label: "Central", icon: <Orbit size={16} /> },
+        { href: "/assistentes", label: "Minhas IAs", icon: <BrainCircuit size={16} /> },
         { href: "/projetos", label: "Projetos", icon: <FolderKanban size={16} /> },
         { href: "/agente", label: "Agente", icon: <Bot size={16} /> },
-        { href: "/assistentes", label: "Assistentes de IA", icon: <BrainCircuit size={16} /> },
         { href: "/computador", label: "Este computador", icon: <Laptop size={16} /> },
         { href: "/conectores", label: "Conectores", icon: <Plug size={16} /> },
         { href: "/custos", label: "Custos e uso", icon: <Gauge size={16} /> },
@@ -38,6 +40,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             <span className="block text-[11px] uppercase tracking-wide">Saldo de créditos</span>
             <span className="text-base font-semibold text-white tabular-nums">{formatBrlMicros(org.creditBalanceBrlMicros)}</span>
             <span className="block">Plano {plan?.name ?? "—"}</span>
+          </Link>
+          <Link href="/conta/seguranca" className="block hover:text-zinc-200">
+            Segurança da conta
           </Link>
           <Link href="/suporte" className="block hover:text-zinc-200">
             Ajuda e suporte

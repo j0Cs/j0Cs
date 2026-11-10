@@ -118,6 +118,8 @@ function createWebAuth() {
           });
         },
       }),
+      // verificação em duas etapas opcional para a conta do cliente (obrigatória só no painel do dono)
+      twoFactor({ issuer: appName() }),
       loginDoDesktop(),
       nextCookies(),
     ],

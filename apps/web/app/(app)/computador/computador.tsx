@@ -163,7 +163,7 @@ function Telemetria({ app, computador }: { app: ForjaDesktop; computador: string
       ) : null}
       <p className="px-5 pb-4 text-xs text-zinc-500">
         Antes de gravar, o app mostra o que muda e pede a sua confirmação. "Envia para outro endereço" quer dizer que a ferramenta já tem telemetria apontando para outro
-        lugar: ligar aqui troca o destino. Grok Build se configura por variável de ambiente, em Assistentes de IA.
+        lugar: ligar aqui troca o destino. Grok Build se configura por variável de ambiente, em Minhas IAs.
       </p>
     </Card>
   );

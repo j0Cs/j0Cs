@@ -173,7 +173,7 @@ function projetoDeTeste() {
 
   await janela.goto(`${BASE}/assistentes`);
   const fontes = await janela.locator("body").innerText();
-  confere("as fontes aparecem em Assistentes de IA (a cancelada foi revogada)", fontes.includes(`Claude Code · ${info.computador}`) && fontes.includes(`Codex · ${info.computador}`));
+  confere("as fontes aparecem em Minhas IAs (a cancelada foi revogada)", fontes.includes(`Claude Code · ${info.computador}`) && fontes.includes(`Codex · ${info.computador}`));
 
   // ---- este computador: pasta e time ----
   await janela.goto(`${BASE}/computador`);
