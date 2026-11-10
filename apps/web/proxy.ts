@@ -11,6 +11,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC = [
   "/", // site (quem já entrou é levado à central pela própria página)
   "/icon.svg",
+  "/rampin-technology.png",
   "/entrar",
   "/cadastro",
   "/recuperar-senha",

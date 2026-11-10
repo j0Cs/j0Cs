@@ -99,7 +99,7 @@ ok(
   "assinatura no cartão ou boleto",
 );
 ok(sessao.metadata.org_id === org0.id && sessao.subscription_data.metadata.org_id === org0.id, "org_id no checkout e na assinatura");
-ok(sim.estado.produtos.has("forja_plan_pro") && [...sim.estado.precos.values()].some((p) => p.lookup_key === "forja_plan_pro_brl_44700_mensal"), "produto e preço do Pro criados no Stripe");
+ok(sim.estado.produtos.has("forja_plan_pro") && [...sim.estado.precos.values()].some((p) => p.lookup_key === "forja_plan_pro_brl_59700_mensal"), "produto e preço do Pro criados no Stripe");
 ok(Boolean((await lerOrg()).billingCustomerId), "cliente do Stripe gravado");
 
 const { assinatura: sub, fatura: f1 } = sim.pagarAssinatura(sessao.id);
@@ -116,7 +116,7 @@ ok(ex1.some((l) => l.kind === "expiry" && l.amountBrlMicros === -R(10)), "extrat
 const trial = await db.query.subscriptions.findFirst({ where: eq(schema.subscriptions.planId, "trial") });
 ok(trial?.status === "canceled", "assinatura de teste encerrada");
 const pag1 = await db.query.payments.findFirst({ where: eq(schema.payments.externalId, f1.id) });
-ok(pag1?.status === "paid" && pag1.method === "card" && pag1.amountBrlCents === 447_00 && Boolean(pag1.paymentIntentId), "pagamento gravado (cartão, R$ 447)");
+ok(pag1?.status === "paid" && pag1.method === "card" && pag1.amountBrlCents === 597_00 && Boolean(pag1.paymentIntentId), "pagamento gravado (cartão, R$ 597)");
 
 // premium liberado no gateway
 const store = createGatewayStore(db);
@@ -302,7 +302,7 @@ ok(vagas.limit === 5, "limite de assentos da equipe = 5");
 
 // ---------------------------------------------------------------- 14. painel do dono
 const painel = await b.resumoDoPainel(db);
-ok(painel.assinantes === 1 && painel.mrrCentavos === 5 * 397_00, "painel: 1 assinatura ativa, MRR da Equipe");
+ok(painel.assinantes === 1 && painel.mrrCentavos === 5 * 497_00, "painel: 1 assinatura ativa, MRR da Equipe");
 ok(painel.porMes[0]!.recargas === 300_00 && painel.porMes[0]!.reembolsos === 150_00, "painel: recargas e reembolsos do mês");
 
 // ---------------------------------------------------------------- 15. convite de fundador (beta fechado)

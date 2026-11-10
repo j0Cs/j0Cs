@@ -1,5 +1,6 @@
 import { buttonClass, cx, linkAcessoClass, Marca } from "@forja/ui";
 import Link from "next/link";
+import { AssinaturaRampin } from "./rampin";
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Forja";
 
@@ -30,7 +31,10 @@ export function RodapeDoSite() {
   return (
     <footer className="relative border-t border-aco-800">
       <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-4 px-6 py-8 font-mono text-[11px] uppercase tracking-[0.18em] text-aco-300">
-        <span>{APP_NAME} · oficina de software</span>
+        <div className="space-y-2">
+          <p>{APP_NAME} · oficina de software</p>
+          <AssinaturaRampin />
+        </div>
         <span className="flex gap-6">
           <Link href="/baixar" className={linkAcessoClass()}>
             Baixar o app

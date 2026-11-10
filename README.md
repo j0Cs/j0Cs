@@ -27,6 +27,7 @@ São dois produtos sobre o mesmo núcleo:
 11. [Assinatura do cliente, time e QA](docs/11-assistentes-auditoria-e-time.md): time de especialistas, auditoria, revisão de PR, telemetria e conectores
 12. [Beta fechado](docs/12-beta-fechado.md): convites de fundador, primeiros passos, métricas, status e suporte
 13. [App desktop](docs/13-app-desktop.md): Electron para macOS e Windows, login pelo navegador, recursos locais, builds e assinatura
+14. [Revisão pré-lançamento](docs/14-revisao-pre-lancamento.md): e-mail, preços em duas linhas, Minhas IAs, boas-vindas, duas etapas e site
 
 Prompts prontos para o Cowork: [login com GitHub](docs/cowork/01-github-login.md) ·
 [e-mail no Microsoft 365](docs/cowork/02-microsoft-365-email.md)

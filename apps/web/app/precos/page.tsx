@@ -3,6 +3,7 @@ import { formatBrlCents, PLAN_KIND_LABELS, TIER_LABELS, TRIAL_DAYS, TRIAL_PLAN_I
 import { asc, eq, getDb, schema } from "@forja/db";
 import { buttonClass, cx, linkAcessoClass, Marca } from "@forja/ui";
 import Link from "next/link";
+import { AssinaturaRampin } from "@/components/site/rampin";
 import { getAuthUser } from "@/lib/session";
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Forja";
@@ -160,6 +161,7 @@ export default async function PrecosPage() {
             ))}
           </dl>
           <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.18em] text-aco-300">Preços em reais, cobrados mensalmente.</p>
+          <AssinaturaRampin className="mt-4" />
         </section>
       </main>
     </div>
