@@ -259,8 +259,8 @@ Para cada vulnerabilidade: onde (arquivo:linha), como seria explorada (cenário 
   },
 };
 
-/** "Dédalo · Dev Sênior": como o especialista aparece em listas e rótulos. */
-export const rotuloDaPersona = (p: Persona) => `${PERSONAS[p].apelido} · ${PERSONAS[p].nome}`;
+/** "Dédalo, o arquiteto": como o especialista aparece em listas e rótulos (sem o cargo). */
+export const rotuloDaPersona = (p: Persona) => `${PERSONAS[p].apelido}, o ${PERSONAS[p].oficio}`;
 
 export const ORDEM_DAS_PERSONAS: Persona[] = ["dev_senior", "dev_pleno", "qa_pleno", "seguranca_pleno"];
 export const ehPersona = (v: unknown): v is Persona => typeof v === "string" && Object.hasOwn(PERSONAS, v);

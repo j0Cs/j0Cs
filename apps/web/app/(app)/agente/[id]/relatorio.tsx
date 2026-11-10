@@ -31,7 +31,7 @@ export interface Relatorio {
   comentario?: { url: string; em: string } | null;
 }
 
-const PERSONA: Record<Persona, string> = { dev_senior: "Dédalo · Dev Sênior", dev_pleno: "Brontes · Dev Pleno", qa_pleno: "Argos · QA Pleno", seguranca_pleno: "Cérbero · Cyber Security" };
+const PERSONA: Record<Persona, string> = { dev_senior: "Dédalo, o arquiteto", dev_pleno: "Brontes, o forjador", qa_pleno: "Argos, o inspetor", seguranca_pleno: "Cérbero, o guardião" };
 const VEREDITO: Record<Veredito, { label: string; tone: "green" | "amber" | "red" }> = {
   pode_seguir: { label: "Pode seguir", tone: "green" },
   seguir_com_ajustes: { label: "Seguir com ajustes", tone: "amber" },

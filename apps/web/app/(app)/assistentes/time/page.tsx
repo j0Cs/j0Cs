@@ -25,10 +25,9 @@ export default function TimePage() {
             <div className="mb-2 flex items-start justify-between gap-2">
               <div>
                 <p className="text-lg font-semibold text-zinc-900">{PERSONAS[p].apelido} <span className="text-sm font-normal text-zinc-500">· o {PERSONAS[p].oficio}</span></p>
-                <p className="text-sm text-zinc-700">{PERSONAS[p].cargo}</p>
                 <p className="text-xs text-zinc-500">{PERSONAS[p].modo === "revisa" ? "Analisa e recomenda (não altera arquivos)" : "Implementa mudanças"}</p>
               </div>
-              <Badge tone="gray">{PERSONAS[p].nome}</Badge>
+              
             </div>
             <p className="text-sm text-zinc-800">{PERSONAS[p].faz}</p>
             <p className="mt-2 text-sm text-zinc-600">

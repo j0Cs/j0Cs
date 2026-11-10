@@ -15,22 +15,22 @@ const PAPEIS = [
   {
     id: "dev_senior",
     label: "Dédalo, o arquiteto",
-    faz: "Dédalo (Dev Sênior) explica como o projeto está montado, avalia decisões de arquitetura e monta o plano de melhorias em ordem de prioridade.",
+    faz: "Dédalo explica como o projeto está montado, avalia decisões de arquitetura e monta o plano de melhorias em ordem de prioridade.",
   },
   {
     id: "dev_pleno",
     label: "Brontes, o forjador",
-    faz: "Brontes (Dev Pleno) escreve o código da funcionalidade ou da correção que você pedir, no padrão do seu projeto e com os testes.",
+    faz: "Brontes escreve o código da funcionalidade ou da correção que você pedir, no padrão do seu projeto e com os testes.",
   },
   {
     id: "qa_pleno",
     label: "Argos, o inspetor",
-    faz: "Argos (QA Pleno) procura bugs e casos de borda no que você mostrar, diz quais testes faltam e monta o plano de teste.",
+    faz: "Argos procura bugs e casos de borda no que você mostrar, diz quais testes faltam e monta o plano de teste.",
   },
   {
     id: "seguranca_pleno",
     label: "Cérbero, o guardião",
-    faz: "Cérbero (Cyber Security) procura falhas que alguém conseguiria explorar, como acesso indevido a dados e chaves expostas, e entrega a correção.",
+    faz: "Cérbero procura falhas que alguém conseguiria explorar, como acesso indevido a dados e chaves expostas, e entrega a correção.",
   },
 ];
 

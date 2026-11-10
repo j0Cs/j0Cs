@@ -251,7 +251,6 @@ export default async function Home() {
               <Revelar como="li" key={t.id} atraso={i * 100} className="cartao-vivo flex flex-col rounded-lg border border-aco-700 bg-aco-900 p-6">
                 <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-brasa-claro">o {t.oficio}</p>
                 <h3 className="mt-2 font-display text-4xl font-extrabold uppercase leading-none tracking-[0.03em] text-aco-100">{t.apelido}</h3>
-                <p className="mt-1.5 font-mono text-[11px] uppercase tracking-[0.16em] text-aco-300">{t.nome}</p>
                 <p className="mt-4 text-sm leading-relaxed text-aco-100">{t.faz}</p>
                 <p className="mb-6 mt-4 text-sm leading-relaxed text-aco-300">
                   <span className="block font-mono text-[11px] uppercase tracking-[0.16em] text-palha">O que você recebe</span>
