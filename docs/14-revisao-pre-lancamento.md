@@ -81,7 +81,7 @@ entre a 2 e a 3.
 
 ## 6. Testes
 
-- 187 testes unitários (7 novos: CPF, CNPJ, telefone e as duas linhas de plano).
+- 189 testes unitários (9 novos: CPF, CNPJ, telefone e as duas linhas de plano).
 - Integração da cobrança, do agente e dos assistentes com os preços novos.
 - Roteiro no navegador com 16 verificações: preços, cadastro, boas-vindas, CNPJ repetido, duas etapas no cadastro e no
   login, Minhas IAs e a resposta do botão de e-mail.
