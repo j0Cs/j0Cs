@@ -1,0 +1,129 @@
+# App desktop da Forja (doc 13).
+# - Em pull request que mexe no app: testes, e instaladores de macOS (Apple Silicon e Intel) e Windows
+#   guardados como artefatos da execução, para testar antes de publicar.
+# - Em tag desktop-vX.Y.Z (igual à versão do apps/desktop/package.json): publica os instaladores num
+#   release do GitHub. É de lá que a página /baixar e a atualização automática baixam.
+# Assinatura (opcional, sem ela o app sai sem assinatura e o sistema avisa na primeira abertura):
+#   macOS: secrets MAC_CERTIFICADO_P12_BASE64, MAC_CERTIFICADO_SENHA, APPLE_ID,
+#          APPLE_APP_SPECIFIC_PASSWORD e APPLE_TEAM_ID.
+# Endereço do app web embutido no instalador: variável FORJA_URL_DO_APP (padrão: o endereço da Vercel).
+name: App desktop
+
+on:
+  pull_request:
+    paths:
+      - "apps/desktop/**"
+      - "packages/agent/src/**"
+      - "packages/insights/src/configuracao.ts"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/desktop.yml"
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verificar:
+    name: Testes e pacote de Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Versão da tag igual à do pacote
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        run: test "desktop-v$(node -p "require('./apps/desktop/package.json').version")" = "$GITHUB_REF_NAME"
+      - run: pnpm --filter @forja/desktop typecheck
+      - run: pnpm --filter @forja/desktop test
+      - run: pnpm --filter @forja/desktop exec node build.mjs
+      - run: pnpm --filter @forja/desktop exec electron-builder --linux dir --publish never
+      - name: Fumaça do app empacotado
+        run: xvfb-run -a pnpm --filter @forja/desktop test:empacotado release/linux-unpacked/forja
+
+  empacotar:
+    name: Instalador (${{ matrix.nome }})
+    needs: verificar
+    runs-on: ${{ matrix.maquina }}
+    timeout-minutes: 45
+    permissions:
+      contents: write # só usada em tag, para criar o release
+    strategy:
+      fail-fast: false
+      # em tag, um por vez: os dois gravam no mesmo release
+      max-parallel: ${{ startsWith(github.ref, 'refs/tags/') && 1 || 2 }}
+      matrix:
+        include:
+          - nome: macOS
+            maquina: macos-latest
+            alvo: --mac --arm64 --x64
+            executavel: release/mac-arm64/Forja.app/Contents/MacOS/Forja
+          - nome: Windows
+            maquina: windows-2022
+            alvo: --win --x64
+            executavel: release/win-unpacked/Forja.exe
+    defaults:
+      run:
+        shell: bash
+    env:
+      FORJA_URL_DO_APP: ${{ vars.FORJA_URL_DO_APP }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Empacotar
+        working-directory: apps/desktop
+        env:
+          MAC_CERTIFICADO: ${{ secrets.MAC_CERTIFICADO_P12_BASE64 }}
+          MAC_CERTIFICADO_SENHA: ${{ secrets.MAC_CERTIFICADO_SENHA }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          [ -n "$FORJA_URL_DO_APP" ] || unset FORJA_URL_DO_APP
+          extra=()
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            if [ -n "$MAC_CERTIFICADO" ]; then
+              export CSC_LINK="$MAC_CERTIFICADO" CSC_KEY_PASSWORD="$MAC_CERTIFICADO_SENHA"
+              echo "Assinando com o certificado da Apple."
+            else
+              # sem certificado: assinatura local (ad-hoc), exigida pelos Macs com chip Apple para o app abrir
+              export CSC_IDENTITY_AUTO_DISCOVERY=false
+              extra+=(-c.mac.identity=- -c.mac.hardenedRuntime=false -c.mac.notarize=false)
+              echo "Sem certificado da Apple: o app sai sem assinatura de desenvolvedor."
+            fi
+          fi
+          publicar=never
+          case "$GITHUB_REF" in refs/tags/desktop-v*) publicar=always ;; esac
+          node build.mjs
+          pnpm exec electron-builder ${{ matrix.alvo }} --publish "$publicar" "${extra[@]}"
+          ls -la release
+      - name: Fumaça do app empacotado
+        working-directory: apps/desktop
+        run: node test-e2e/empacotado.cjs "${{ matrix.executavel }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: forja-${{ matrix.nome }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.yml
+            apps/desktop/release/*.blockmap
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,14 @@
+export * from "./conectores";
+export * from "./conversa";
+export * from "./entrega";
+export * from "./estrutura";
+export * from "./ferramentas";
+export * from "./github";
+export * from "./personas";
+export * from "./projetos";
+export * from "./supabase";
+export * from "./tarefas";
+export * from "./varredura";
+export * from "./vercel";
+export * from "./workspace";
+export type * from "./desktop";

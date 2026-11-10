@@ -1,0 +1,30 @@
+{
+  "name": "@forja/desktop",
+  "productName": "Forja",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Forja no computador: o app web com o que só dá para fazer na máquina do cliente.",
+  "author": "Forja",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "build": "node build.mjs",
+    "electron:instalar": "node node_modules/electron/install.js",
+    "dev": "node build.mjs && electron .",
+    "test:app": "node build.mjs && xvfb-run -a node test-e2e/app.e2e.cjs",
+    "empacotar": "node build.mjs && electron-builder --publish never",
+    "publicar": "node build.mjs && electron-builder --publish always",
+    "test:empacotado": "node test-e2e/empacotado.cjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
+    "electron-updater": "6.8.11",
+    "esbuild": "0.28.2",
+    "playwright-core": "1.63.0",
+    "typescript": "5.9.3",
+    "vitest": "^5.1.0"
+  }
+}
