@@ -26,6 +26,11 @@ const OUTROS = [
   "ANTHROPIC_WORKSPACE_ID",
   "OPENAI_ADMIN_KEY",
   "OPENAI_PROJECT_ID",
+  // envio de e-mail pelo Microsoft 365 (doc 5)
+  "MS_TENANT_ID",
+  "MS_CLIENT_ID",
+  "MS_CLIENT_SECRET",
+  "EMAIL_FROM",
 ];
 
 /** Chaves que autorizam a chamada: a service_role (legada) e as chaves secretas novas (sb_secret_). */

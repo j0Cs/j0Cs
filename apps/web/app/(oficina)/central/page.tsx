@@ -9,7 +9,8 @@ import { Relogio } from "@/components/oficina/relogio";
 import { listModelOptions } from "@/lib/models";
 import { ASSISTANT_NAME, firstName, greeting } from "@/lib/persona";
 import { getSession } from "@/lib/session";
-import { resendVerification, signOut } from "../../(app)/actions";
+import { ConfirmarEmail } from "@/components/confirmar-email";
+import { signOut } from "../../(app)/actions";
 import { comecarEscrevendo } from "../actions";
 
 export const metadata = { title: "Central" };
@@ -135,10 +136,7 @@ export default async function CentralPage({ searchParams }: { searchParams: Prom
         <section className="order-3 space-y-4">
           {aviso ? <p className="rounded-md border border-brasa/40 bg-brasa/10 px-3 py-2 text-sm text-brasa-claro">{aviso}</p> : null}
           {!user.emailVerified ? (
-            <form action={resendVerification} className="rounded-md border border-palha/40 bg-palha/10 px-3 py-2 text-sm text-palha">
-              Confirme seu e-mail (<b>{user.email}</b>) para liberar os modelos de IA.{" "}
-              <button className="font-semibold underline underline-offset-2">Reenviar e-mail</button>
-            </form>
+            <ConfirmarEmail email={user.email} tema="oficina" />
           ) : null}
           <form action={comecarEscrevendo} className="anim-surgir rounded-xl border border-aco-700 bg-aco-850/70 p-5 backdrop-blur [animation-delay:220ms]">
             <div className="flex items-start justify-between gap-3">

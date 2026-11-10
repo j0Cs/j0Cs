@@ -23,6 +23,7 @@ import {
   startOfMonth,
 } from "@forja/db";
 import { Card, CardHeader, cx, EmptyState, Notice, PageHeader, Stat, Table, Td, Th } from "@forja/ui";
+import { emailConfigurado } from "@forja/auth";
 import { adminDb } from "@/lib/admin";
 
 export default async function Overview() {
@@ -38,6 +39,7 @@ export default async function Overview() {
     db.select({ providerId: schema.providerKeys.providerId }).from(schema.providerKeys),
   ]);
   const nosSecrets = await nomesNosSecrets();
+  const emailOk = await emailConfigurado();
 
   const apiCostBrl = effectiveCostBrlMicros(overview.costUsdMicros, settings);
   const usageMargin = overview.chargeBrlMicros - apiCostBrl;
@@ -54,6 +56,15 @@ export default async function Overview() {
         description={`Mês atual · câmbio US$ 1 = ${formatBrl(settings.fxUsdBrl)} · sobrecusto ${settings.costOverheadPercent}% (IOF/spread/tributos)`}
       />
 
+      {!emailOk ? (
+        <div className="mb-4">
+          <Notice tone="red">
+            <b>Nenhum e-mail está saindo.</b> Confirmação de conta, recuperação de senha, convites de equipe e avisos de cobrança dependem do Microsoft 365, que ainda
+            não foi configurado. Cadastre <code>MS_TENANT_ID</code>, <code>MS_CLIENT_ID</code>, <code>MS_CLIENT_SECRET</code> e <code>EMAIL_FROM</code> nos Secrets das
+            Edge Functions do Supabase (passo a passo no doc 5).
+          </Notice>
+        </div>
+      ) : null}
       {providersWithoutKey.length ? (
         <div className="mb-4">
           <Notice>

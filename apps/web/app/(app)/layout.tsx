@@ -5,7 +5,8 @@ import { Bot, BrainCircuit, CreditCard, FolderKanban, Gauge, Laptop, LogOut, Orb
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/session";
-import { resendVerification, signOut } from "./actions";
+import { ConfirmarEmail } from "@/components/confirmar-email";
+import { signOut } from "./actions";
 
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Forja";
 
@@ -88,14 +89,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       ) : null}
       {!user.emailVerified ? (
         <div className="mb-4">
-          <Notice>
-            <form action={resendVerification} className="flex flex-wrap items-center justify-between gap-2">
-              <span>
-                Confirme seu e-mail (<b>{user.email}</b>) para usar os modelos de IA.
-              </span>
-              <button className="text-sm font-medium underline">Reenviar e-mail</button>
-            </form>
-          </Notice>
+          <ConfirmarEmail email={user.email} />
         </div>
       ) : null}
       {children}

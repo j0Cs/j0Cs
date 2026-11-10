@@ -1,8 +1,13 @@
+import { segredo } from "@forja/db";
+
 /**
  * Envio de e-mail transacional pelo Microsoft 365 (Microsoft Graph, permissão de
  * aplicativo Mail.Send restrita a UMA caixa — ver docs/05-microsoft-365-email.md).
  *
- * Sem MS_TENANT_ID/MS_CLIENT_ID/MS_CLIENT_SECRET:
+ * As credenciais (MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET e EMAIL_FROM) vêm das variáveis de
+ * ambiente ou dos Secrets do Supabase (função forja-chaves).
+ *
+ * Sem elas:
  * - desenvolvimento: o e-mail é impresso no console do servidor (com o link);
  * - produção: falha visível no log, SEM expor o link (quem lê log entraria na conta).
  *   EMAIL_TO_CONSOLE=1 libera o console só para testes locais com `next start`.
@@ -22,11 +27,24 @@ interface GraphConfig {
   from: string;
 }
 
-function graphConfig(): GraphConfig | null {
-  const { MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET, EMAIL_FROM } = process.env;
-  if (!MS_TENANT_ID || !MS_CLIENT_ID || !MS_CLIENT_SECRET) return null;
-  if (!EMAIL_FROM) throw new Error("EMAIL_FROM (caixa remetente do Microsoft 365) não definido.");
-  return { tenantId: MS_TENANT_ID, clientId: MS_CLIENT_ID, clientSecret: MS_CLIENT_SECRET, from: EMAIL_FROM };
+async function graphConfig(): Promise<GraphConfig | null> {
+  const [tenantId, clientId, clientSecret, from] = await Promise.all([segredo("MS_TENANT_ID"), segredo("MS_CLIENT_ID"), segredo("MS_CLIENT_SECRET"), segredo("EMAIL_FROM")]);
+  if (!tenantId || !clientId || !clientSecret) return null;
+  if (!from) throw new Error("EMAIL_FROM (caixa remetente do Microsoft 365) não definido.");
+  return { tenantId, clientId, clientSecret, from };
+}
+
+/**
+ * true quando um e-mail enviado agora chega de verdade. Em desenvolvimento, sem credenciais, o
+ * e-mail vai para o console do servidor e conta como entregue.
+ */
+export async function emailConfigurado(): Promise<boolean> {
+  if (process.env.NODE_ENV !== "production" || process.env.EMAIL_TO_CONSOLE === "1") return true;
+  try {
+    return (await graphConfig()) !== null;
+  } catch {
+    return false;
+  }
 }
 
 let cachedToken: { value: string; expiresAt: number; key: string } | null = null;
@@ -54,7 +72,7 @@ async function graphToken(cfg: GraphConfig, fetchImpl: typeof fetch): Promise<st
 }
 
 export async function sendEmail(msg: EmailMessage, fetchImpl: typeof fetch = fetch): Promise<void> {
-  const cfg = graphConfig();
+  const cfg = await graphConfig();
   if (!cfg) {
     if (process.env.NODE_ENV === "production" && process.env.EMAIL_TO_CONSOLE !== "1") {
       console.error(JSON.stringify({ level: "error", msg: "Microsoft 365 não configurado: e-mail não enviado", to: msg.to, subject: msg.subject }));
